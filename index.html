@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CYPHER: O Código da Lógica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+/* Layout: um console de plantão em coluna única — cabeçalho fixo de status, terminal do invasor, cartão do nó, ferramentas embaixo. */
+:root{
+  color-scheme:dark;
+  --bg:#110a0c; --panel:#1b1013; --panel2:#24161a; --line:#3b242a; --term:#0b0607;
+  --ink:#f1e5d6; --mute:#a99189; --amber:#ffb347; --cyan:#5ce1e6; --red:#ff5c6c;
+  --f-display:"Chakra Petch","Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --fs:16px;
+}
+:root.pres{--fs:19px}
+html{font-size:var(--fs)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.6 var(--f-mono)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px)}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:50;opacity:0}
+#fx.bad{background:radial-gradient(ellipse at center,transparent 35%,rgba(255,92,108,.42));animation:flash .5s ease-out}
+#fx.ok{background:radial-gradient(ellipse at center,transparent 45%,rgba(92,225,230,.28));animation:flash .6s ease-out}
+@keyframes flash{0%{opacity:1}100%{opacity:0}}
+main.shake{animation:shake .35s}
+@keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:18px}
+.hdr .wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-block:10px}
+.brand{font:700 1.05rem/1 var(--f-display);letter-spacing:.18em}
+.brand small{font:400 .72rem var(--f-mono);letter-spacing:.04em;color:var(--mute);margin-left:8px}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.tools button{font-size:.75rem;padding:5px 9px}
+
+h1,h2{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:clamp(2.6rem,9vw,4.4rem);line-height:.95;letter-spacing:.06em;color:var(--amber)}
+h2{font-size:1.3rem;line-height:1.25;margin-bottom:10px}
+p{margin:0 0 12px}
+.dim{color:var(--mute);font-size:.85rem}
+.kick{font:600 .72rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+small{font-size:.75rem}
+
+button,input{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 14px;cursor:pointer;transition:border-color .15s}
+button:hover:not(:disabled){border-color:var(--amber)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.go{background:var(--amber);color:#1a0e08;border-color:var(--amber);font-weight:700}
+.go:hover:not(:disabled){background:#ffc56e}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:14px;min-width:0}
+
+/* tela inicial */
+.lore{max-width:62ch}
+.diff{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.diff button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 14px}
+.diff button small{font-weight:400;opacity:.8}
+.opts{display:grid;gap:10px;margin:6px 0 14px}
+.chk{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.chk input{margin-top:5px;accent-color:var(--amber)}
+.codein{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input[type=text]{background:var(--term);border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-width:0}
+#code{width:9.5em;text-transform:uppercase;letter-spacing:.12em}
+details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;color:var(--amber)}
+details ul{margin:8px 0 0;padding-left:1.2em;color:var(--mute);font-size:.88rem}
+@media (max-width:520px){.diff{grid-template-columns:1fr}}
+
+/* placar */
+.tabs{display:flex;gap:6px;margin:10px 0}
+.tabs button[aria-selected=true]{border-color:var(--amber);color:var(--amber)}
+.sc-t{border-collapse:collapse;width:100%;font-size:.85rem;font-variant-numeric:tabular-nums}
+.sc-t th,.sc-t td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left}
+.sc-t th{color:var(--mute);font-weight:400}
+
+/* tela de jogo */
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px}
+.top>div:first-child{min-width:0;flex:1}
+#clock{flex:none;white-space:nowrap;font:700 3.4rem/1 var(--f-display);color:var(--amber);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+#clock.low{color:var(--red)}
+#clock.crit{color:var(--red);animation:blink 1s steps(2) infinite}
+#clock.paused{opacity:.45}
+@keyframes blink{50%{opacity:.4}}
+#bar{display:flex;gap:4px;margin-bottom:12px}
+#bar i{flex:1;height:6px;background:var(--line);border-radius:2px;display:block}
+#bar i.gap{margin-left:8px}
+#bar i.d{background:var(--cyan)} #bar i.n{background:var(--amber)} #bar i.s{background:var(--mute)}
+#bar.jump i{cursor:pointer;height:10px}
+#log{background:var(--term);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:.78rem;line-height:1.5;min-height:6.4em;margin-bottom:14px;overflow:hidden}
+.ln b{font-weight:700}
+.ln.nul b{color:var(--red)} .ln.sys b{color:var(--cyan)} .ln.alr b{color:var(--amber)} .ln.ok b{color:var(--cyan)}
+.ln.nul span{color:#f4c7c7}
+.sc{border-left:3px solid var(--amber);padding:2px 0 2px 12px;color:var(--mute);max-width:68ch}
+.q{font-weight:700;margin-top:4px}
+#box{margin:14px 0 0;min-width:0}
+#box.locked{pointer-events:none}
+#box.locked button:not(.go),#box.locked input{opacity:.75}
+.scroll{overflow-x:auto;max-width:100%}
+
+table.tg{border-collapse:collapse;margin-bottom:12px;font-variant-numeric:tabular-nums}
+table.tg td,table.tg th{border:1px solid var(--line);padding:4px 12px;text-align:center}
+.c{min-width:3.2em;padding:5px 10px}
+.c.v{color:var(--cyan);border-color:var(--cyan)} .c.f{color:var(--red);border-color:var(--red)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip.on{background:var(--amber);color:#1a0e08;border-color:var(--amber)}
+.fields{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.fields label{display:flex;align-items:center;gap:8px}
+.fields input{width:9em;font-variant-numeric:tabular-nums}
+.big{font:700 2.2rem/1.1 var(--f-display);font-variant-numeric:tabular-nums;margin-bottom:6px}
+.big small{font:400 .8rem var(--f-mono);color:var(--mute)}
+input[type=range]{width:100%;accent-color:var(--amber);margin:8px 0}
+.mcs{display:grid;gap:8px;margin-bottom:6px}
+.mcs button{text-align:left;padding:10px 14px}
+.mcs button.x{opacity:.4;text-decoration:line-through}
+.mcs button.r{border-color:var(--cyan);color:var(--cyan)}
+
+svg.chart{width:100%;max-width:460px;display:block;margin:6px 0 10px}
+svg.chart text{fill:var(--mute);font:10px var(--f-mono)}
+svg.chart .gr{stroke:var(--line);stroke-width:1}
+svg.chart .ax{stroke:var(--mute);stroke-width:1}
+svg.chart .ln{fill:none;stroke:var(--amber);stroke-width:2.5}
+svg.chart .pt{fill:var(--amber)}
+svg.chart .cap{stroke:var(--red);stroke-width:1.5;stroke-dasharray:5 4}
+svg.chart text.capt{fill:var(--red)}
+svg.chart .fit{stroke:var(--cyan);stroke-width:2;stroke-dasharray:6 4}
+svg.chart .hit{fill:none;stroke:var(--cyan);stroke-width:2}
+
+.matrix{display:flex;align-items:center;gap:10px;margin:4px 0 12px;font-variant-numeric:tabular-nums}
+.mx table{border-collapse:collapse;border-left:2px solid var(--mute);border-right:2px solid var(--mute);border-radius:4px}
+.mx td{padding:2px 10px;text-align:right}
+table.dt{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.88rem;margin-bottom:8px}
+table.dt th,table.dt td{border:1px solid var(--line);padding:4px 10px;text-align:center}
+table.dt th{color:var(--mute);font-weight:400;text-align:left;white-space:nowrap}
+.sums{font-size:.82rem;color:var(--cyan)}
+
+#fb{min-height:1.6em;margin:12px 0 10px}
+.okm{color:var(--cyan)} .badm{color:var(--red)} .hintm{color:var(--amber)}
+.acts{margin-top:4px}
+.hint{margin-top:12px;border:1px dashed var(--amber);border-radius:8px;padding:10px 12px;color:var(--amber);font-size:.9rem}
+.sol{margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+.sol h3{font:600 .95rem var(--f-display);margin:0 0 8px;color:var(--cyan);letter-spacing:.04em}
+.sol .lx{margin:0 0 16px;max-width:72ch}
+.sol .lx>p{margin:0 0 8px;font-size:.9rem}
+.sol h4{font:600 .78rem var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0 0 8px}
+.sol .ex{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.sol .ex h4{color:var(--amber)}
+.sol .pit{border-left:3px solid var(--red);padding:4px 0 4px 12px;font-size:.9rem;max-width:72ch;margin:0}
+.sol .pit b{color:var(--red)}
+.sol sup{font-size:.72em;line-height:0}
+.sol code{font:inherit;color:var(--amber);background:var(--term);border-radius:4px;padding:0 4px}
+table.dt.c th{text-align:center}
+table.dt.l td{text-align:left}
+table.dt tr.tot td{color:var(--cyan);font-weight:600;white-space:nowrap}
+.sol .st{margin:0 0 8px;padding-left:1.7em;text-indent:-1.7em;font-size:.9rem;max-width:72ch}
+.sol .st b{display:inline-block;width:1.7em;text-indent:0;color:var(--cyan)}
+.sol .blk{margin:2px 0 12px;min-width:0}
+table.tt{border-collapse:collapse;font-size:.85rem;margin:4px 0}
+table.tt td,table.tt th{border:1px solid var(--line);padding:3px 10px;text-align:center;white-space:nowrap}
+table.tt th.m{color:var(--amber)} table.tt td.t{color:var(--cyan)} table.tt td.f{color:var(--red)} table.tt td.m{font-weight:700}
+
+/* calculadora */
+#calc label{display:block}
+#ci{width:100%;font-size:1.05rem;margin-top:6px}
+#res{margin-top:8px;font:700 1.25rem var(--f-display);color:var(--cyan);min-height:1.5em;font-variant-numeric:tabular-nums}
+#res.err{color:var(--mute);font:400 .85rem var(--f-mono)}
+#hist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#hist button{font-size:.78rem;padding:4px 8px}
+.keys{font-size:.78rem}
+
+/* fases e final */
+.phase{text-align:left;padding:28px 22px}
+.phase .num{font:700 4.5rem/1 var(--f-display);color:var(--amber);opacity:.9}
+.phase .concepts{color:var(--cyan);font-size:.85rem;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.stats div{border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.stats b{display:block;font:700 1.3rem var(--f-display);font-variant-numeric:tabular-nums}
+.stats span{color:var(--mute);font-size:.75rem}
+#save{margin:10px 0 16px}
+#nm{width:12em}
+.badge{display:inline-block;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+
+@media (max-width:520px){
+  #clock{font-size:2.5rem}
+  .card{padding:16px}
+  .phase .num{font-size:3.4rem}
+}
+@media (prefers-reduced-motion:reduce){
+  main.shake{animation:none}
+  #fx.bad,#fx.ok{animation-duration:.01s}
+  #clock.crit{animation:none}
+}
+
+</style>
+</head>
+<body>
+<div id="fx" aria-hidden="true"></div>
+<header class="hdr">
+  <div class="wrap">
+    <div class="brand">CYPHER<small>Nexus Corp · terminal de emergência</small><span class="badge" id="presBadge" hidden>Apresentação</span></div>
+    <div class="tools">
+      <button id="bPause" type="button" hidden>Pausar (P)</button>
+      <button id="bSom" type="button" aria-pressed="true">Som: ligado</button>
+      <button id="bTrilha" type="button" aria-pressed="true">Trilha: ligada</button>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="main">
+
+<section id="s-start">
+  <div class="card">
+    <p class="kick">Nexus Corp · 2038 · plantão noturno</p>
+    <h1>CYPHER</h1>
+    <p class="dim" style="margin-top:6px">O Código da Lógica</p>
+    <div class="lore">
+      <p>Os alarmes do painel central piscam em vermelho. O grupo NullSet injetou um Protocolo de Colapso Lógico, que corrompe as tabelas booleanas e as matrizes dos servidores. Em 60 minutos de relógio, o Core principal sofre um buffer overflow e, nesta história, os data centers do mundo apagam.</p>
+      <p>Você é o administrador de sistemas sênior de plantão, sozinho no terminal de emergência. São três setores e nove nós comprometidos; cada um só volta ao ar com a matemática certa.</p>
+    </div>
+    <p class="kick" style="margin-top:8px">Escolha a dificuldade e comece</p>
+    <div class="diff">
+      <button class="go" type="button" data-d="0">Fácil<small>relógio dura 15 min reais · erro −1 min</small></button>
+      <button class="go" type="button" data-d="1">Médio<small>relógio dura 9 min reais · erro −2 min</small></button>
+      <button class="go" type="button" data-d="2">Difícil<small>relógio dura 6 min reais · erro −3 min</small></button>
+    </div>
+    <div class="opts">
+      <label class="chk" for="pres"><input type="checkbox" id="pres"><span>Modo apresentação <span class="dim">· relógio começa pausado, letras maiores, atalhos para pular e voltar nós. Não conta no placar.</span></span></label>
+      <div class="codein"><label for="code">Código da partida</label><input type="text" id="code" maxlength="8" placeholder="opcional" autocomplete="off" spellcheck="false"><span class="dim">Repita um código para jogar com os mesmos números.</span></div>
+    </div>
+    <div class="row"><button type="button" id="bScores" aria-expanded="false">Ver placar</button></div>
+    <div id="scores" hidden></div>
+    <details>
+      <summary>Como jogar</summary>
+      <ul>
+        <li>Cada nó traz um cenário, uma pergunta e a ferramenta de resposta (tabela, seleção, campos, controle ou alternativas).</li>
+        <li>Os números são sorteados a cada partida. O código da partida aparece no topo do jogo e permite repetir os mesmos números.</li>
+        <li>Erros e dicas descontam tempo. Depois de 3 erros no mesmo nó, você pode liberar a resolução comentada pagando tempo.</li>
+        <li>Ao acertar, a resolução comentada mostra o passo a passo com os números da sua partida.</li>
+        <li>A calculadora aceita + − * / ^ ( ), fatorial (5!), raiz (sqrt), ln, log, C(n;k) e A(n;k). Decimais com vírgula ou ponto.</li>
+        <li>Atalhos: C abre a calculadora, M liga ou desliga o som. No modo apresentação: P pausa, N avança, B volta e S mostra a resolução.</li>
+      </ul>
+    </details>
+  </div>
+</section>
+
+<section id="s-phase" hidden>
+  <div class="card phase">
+    <p class="kick" id="pk"></p>
+    <div class="num" id="pn"></div>
+    <h2 id="pt"></h2>
+    <p id="ps" class="lore"></p>
+    <p class="concepts" id="pc"></p>
+    <button class="go" type="button" id="pgo">Entrar no setor</button>
+  </div>
+</section>
+
+<section id="s-game" hidden>
+  <div class="top">
+    <div><div id="ph" class="kick"></div><div id="codeLbl" class="dim"></div></div>
+    <div id="clock" role="timer" aria-label="Tempo restante">60:00</div>
+  </div>
+  <div id="bar"></div>
+  <div id="log" aria-live="polite"></div>
+  <div class="card" id="node">
+    <h2 id="h"></h2>
+    <p class="sc" id="sc"></p>
+    <div id="extra"></div>
+    <div id="chart"></div>
+    <p class="q" id="q"></p>
+    <div id="box"></div>
+    <div id="fb" aria-live="polite"></div>
+    <div class="row acts">
+      <button type="button" id="hb"></button>
+      <button type="button" id="cb" aria-expanded="false">Calculadora (C)</button>
+      <button type="button" id="sb" hidden></button>
+      <button type="button" id="pv" hidden>Nó anterior</button>
+      <button type="button" class="go" id="nx" hidden>Próximo nó</button>
+    </div>
+    <div id="hintTxt" class="hint" hidden></div>
+    <div id="sol" class="sol" hidden></div>
+  </div>
+  <div class="card" id="calc" hidden>
+    <label for="ci" class="dim">Calculadora · Enter guarda o resultado; toque num resultado guardado para colar no campo de resposta.</label>
+    <input type="text" id="ci" autocomplete="off" spellcheck="false" inputmode="text" placeholder="ex.: 2*3^5, C(6;2), 1-(0,95)^4">
+    <div id="res"></div>
+    <div id="hist"></div>
+  </div>
+  <p id="keys" class="dim keys" hidden>Atalhos do modo apresentação: P pausar · N próximo nó · B nó anterior · S resolução · C calculadora · M som</p>
+</section>
+
+<section id="s-end" hidden>
+  <div class="card">
+    <p class="kick" id="ek"></p>
+    <h2 id="et"></h2>
+    <p id="em" class="lore"></p>
+    <div id="stats" class="stats"></div>
+    <div id="save" hidden>
+      <div class="row"><label for="nm">Seu nome no placar</label><input type="text" id="nm" maxlength="12" autocomplete="off"><button type="button" class="go" id="bSave">Salvar tempo</button></div>
+      <p class="dim" id="saveMsg" style="margin-top:6px"></p>
+    </div>
+    <div id="endScores"></div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="go" id="again">Nova partida</button>
+      <button type="button" id="same">Repetir este código</button>
+      <button type="button" id="home">Menu inicial</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* CYPHER — motor matemático (sem DOM). Gera os desafios a partir de um código de partida. */
+var C = (function () {
+'use strict';
+const C = {};
+
+/* ---------- sorteio reprodutível ---------- */
+C.rng = function (seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+C.newCode = function () { let s = ''; for (let i = 0; i < 6; i++) s += ALPH[Math.floor(Math.random() * ALPH.length)]; return s; };
+C.cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+C.seed = function (code) { let h = 2166136261; for (let i = 0; i < code.length; i++) { h ^= code.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const ri = (r, a, b) => a + Math.floor(r() * (b - a + 1));
+const pick = (r, a) => a[Math.floor(r() * a.length)];
+const shuffle = (r, arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+const sum = a => a.reduce((s, v) => s + v, 0);
+
+/* ---------- números ---------- */
+C.fact = n => { if (!Number.isInteger(n) || n < 0 || n > 170) return NaN; let v = 1; for (let k = 2; k <= n; k++) v *= k; return v; };
+C.perm = (n, k) => { if (!Number.isInteger(n) || !Number.isInteger(k) || n < 0 || k < 0 || k > n) return NaN; let v = 1; for (let i = 0; i < k; i++) v *= n - i; return v; };
+C.comb = (n, k) => { const p = C.perm(n, k); return isNaN(p) ? NaN : Math.round(p / C.fact(k)); };
+function nfBase(n, dec, keep) {
+  if (!isFinite(n)) return String(n);
+  const m = Math.pow(10, dec); let v = Math.round(n * m) / m; if (v === 0) v = 0;
+  const neg = v < 0; const parts = Math.abs(v).toFixed(dec).split('.');
+  let i = parts[0], f = parts[1] || '';
+  if (!keep) f = f.replace(/0+$/, '');
+  if (i.length > 4) i = i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (neg ? '−' : '') + i + (f ? ',' + f : '');
+}
+C.nf = (n, dec) => nfBase(n, dec === undefined ? 4 : dec, false);
+C.nfx = (n, dec) => nfBase(n, dec, true);
+const nf = C.nf, nfx = C.nfx;
+C.parseNum = function (s) {
+  s = String(s == null ? '' : s).trim().replace(/[\s  ]/g, '').replace(/^−/, '-').replace(/^\+/, '');
+  if (/^-?[1-9]\d{0,2}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  s = s.replace(',', '.');
+  return /^-?(\d+\.?\d*|\.\d+)$/.test(s) ? parseFloat(s) : NaN;
+};
+
+/* ---------- calculadora (analisador próprio, sem eval) ---------- */
+C.calc = function (src, ans) {
+  try {
+    const s = String(src).replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/\s+/g, '');
+    if (!s) return NaN;
+    const tk = [], st = []; let i = 0;
+    while (i < s.length) {
+      const ch = s[i], top = st[st.length - 1];
+      if (/[0-9.]/.test(ch)) {
+        let j = i, num = '';
+        while (j < s.length) {
+          const c = s[j];
+          if (/[0-9]/.test(c)) { num += c; j++; }
+          else if (c === '.') { num += '.'; j++; }
+          else if (c === ',' && top !== 'f' && /[0-9]/.test(s[j + 1] || '')) { num += '.'; j++; }
+          else break;
+        }
+        if ((num.match(/\./g) || []).length > 1 || num === '.') return NaN;
+        tk.push({ t: 'n', v: parseFloat(num) }); i = j; continue;
+      }
+      if (/[a-zA-Zπ]/.test(ch)) {
+        let j = i; while (j < s.length && /[a-zA-Zπ]/.test(s[j])) j++;
+        const id = s.slice(i, j).toLowerCase();
+        if (s[j] === '(') { tk.push({ t: 'f', v: id }); tk.push({ t: '(' }); st.push('f'); i = j + 1; }
+        else { tk.push({ t: 'c', v: id }); i = j; }
+        continue;
+      }
+      if (ch === '(') { st.push('p'); tk.push({ t: '(' }); i++; continue; }
+      if (ch === ')') { st.pop(); tk.push({ t: ')' }); i++; continue; }
+      if (ch === ',' || ch === ';') { tk.push({ t: ',' }); i++; continue; }
+      if ('+-*/^!'.includes(ch)) { tk.push({ t: ch }); i++; continue; }
+      return NaN;
+    }
+    let p = 0;
+    const peek = () => tk[p];
+    const is = t => tk[p] && tk[p].t === t;
+    const FN = { sqrt: [1, Math.sqrt], raiz: [1, Math.sqrt], ln: [1, Math.log], log: [1, Math.log10], exp: [1, Math.exp], c: [2, C.comb], a: [2, C.perm] };
+    const CN = { pi: Math.PI, 'π': Math.PI, e: Math.E, ans: ans };
+    function expr() { let v = term(); while (is('+') || is('-')) { const o = tk[p++].t, w = term(); v = o === '+' ? v + w : v - w; } return v; }
+    function term() { let v = unary(); while (is('*') || is('/')) { const o = tk[p++].t, w = unary(); v = o === '*' ? v * w : v / w; } return v; }
+    function unary() { if (is('-')) { p++; return -unary(); } if (is('+')) { p++; return unary(); } return power(); }
+    function power() { const b = post(); if (is('^')) { p++; return Math.pow(b, unary()); } return b; }
+    function post() { let v = prim(); while (is('!')) { p++; v = C.fact(v); } return v; }
+    function prim() {
+      const k = peek(); if (!k) throw 0;
+      if (k.t === 'n') { p++; return k.v; }
+      if (k.t === 'c') { p++; if (!(k.v in CN) || CN[k.v] === undefined) throw 0; return CN[k.v]; }
+      if (k.t === 'f') {
+        p++; const fn = FN[k.v]; if (!fn) throw 0;
+        if (!is('(')) throw 0; p++;
+        const args = [expr()]; while (is(',')) { p++; args.push(expr()); }
+        if (!is(')')) throw 0; p++;
+        if (args.length !== fn[0]) throw 0;
+        return fn[1].apply(null, args);
+      }
+      if (k.t === '(') { p++; const v = expr(); if (!is(')')) throw 0; p++; return v; }
+      throw 0;
+    }
+    const v = expr(); if (p !== tk.length) return NaN; return v;
+  } catch (e) { return NaN; }
+};
+
+/* ---------- lógica proposicional ---------- */
+C.parseLogic = function (src) {
+  const t = src.replace(/\s+/g, '').split(''); let i = 0;
+  const peek = () => t[i];
+  function iff() { let l = imp(); while (peek() === '↔') { i++; l = { o: '↔', a: l, b: imp() }; } return l; }
+  function imp() { const l = or(); if (peek() === '→') { i++; return { o: '→', a: l, b: imp() }; } return l; }
+  function or() { let l = and(); while (peek() === '∨') { i++; l = { o: '∨', a: l, b: and() }; } return l; }
+  function and() { let l = not(); while (peek() === '∧') { i++; l = { o: '∧', a: l, b: not() }; } return l; }
+  function not() {
+    const c = peek();
+    if (c === '¬') { i++; return { o: '¬', a: not() }; }
+    if (c === '(') { i++; const x = iff(); if (t[i] !== ')') throw Error('")" esperado em ' + src); i++; return x; }
+    if (c === 'P' || c === 'Q' || c === 'R') { i++; return { v: c }; }
+    throw Error('símbolo inesperado em ' + src);
+  }
+  const x = iff(); if (i !== t.length) throw Error('sobra em ' + src); return x;
+};
+C.evalLogic = function (n, e) {
+  if (n.v) return e[n.v];
+  const a = C.evalLogic(n.a, e); if (n.o === '¬') return !a;
+  const b = C.evalLogic(n.b, e);
+  switch (n.o) { case '∧': return a && b; case '∨': return a || b; case '→': return !a || b; case '↔': return a === b; }
+  throw Error('operador');
+};
+C.strLogic = function (n) {
+  const w = x => x.v ? x.v : (x.o === '¬' ? C.strLogic(x) : '(' + C.strLogic(x) + ')');
+  if (n.v) return n.v; if (n.o === '¬') return '¬' + w(n.a);
+  return w(n.a) + ' ' + n.o + ' ' + w(n.b);
+};
+C.subs = function (n, out) { out = out || []; if (n.v) return out; C.subs(n.a, out); if (n.b) C.subs(n.b, out); const s = C.strLogic(n); if (!out.some(x => x.s === s)) out.push({ s, n }); return out; };
+C.varsOf = src => ['P', 'Q', 'R'].filter(v => src.includes(v));
+C.rowsFor = vs => [...Array(Math.pow(2, vs.length))].map((_, m) => vs.map((_, j) => !!((m >> (vs.length - 1 - j)) & 1)));
+const env = (vs, row) => { const e = {}; vs.forEach((v, k) => { e[v] = row[k]; }); return e; };
+C.column = (src, vs) => { const a = C.parseLogic(src); return C.rowsFor(vs).map(row => C.evalLogic(a, env(vs, row))); };
+C.equiv = function (a, b) { const vs = C.varsOf(a + b); const x = C.column(a, vs), y = C.column(b, vs); return x.every((v, k) => v === y[k]); };
+const VF = b => b ? 'V' : 'F';
+function ttHTML(vs, cols) {
+  const rows = C.rowsFor(vs);
+  let h = '<div class="scroll"><table class="tt"><tr>' + vs.map(v => '<th>' + v + '</th>').join('') + cols.map(c => '<th' + (c.main ? ' class="m"' : '') + '>' + c.s + '</th>').join('') + '</tr>';
+  rows.forEach((row, k) => {
+    h += '<tr>' + row.map(b => '<td>' + VF(b) + '</td>').join('') + cols.map(c => { const b = c.vals[k]; return '<td class="' + (b ? 't' : 'f') + (c.main ? ' m' : '') + '">' + VF(b) + '</td>'; }).join('') + '</tr>';
+  });
+  return h + '</table></div>';
+}
+const rowTxt = (vs, row) => '(' + vs.map((v, k) => v + ' = ' + VF(row[k])).join(', ') + ')';
+
+/* ---------- gráficos SVG ---------- */
+C.svgGrowth = function (a, b, L, xmax) {
+  const W = 400, H = 182, x0 = 42, x1 = 388, y0 = 154, y1 = 12, ymax = L * 2.4;
+  const X = x => x0 + x / xmax * (x1 - x0), Y = y => y0 - Math.min(y, ymax) / ymax * (y0 - y1);
+  const pts = []; for (let k = 0; k <= xmax * 8; k++) { const x = k / 8; pts.push(X(x).toFixed(1) + ',' + Y(a * Math.pow(b, x)).toFixed(1)); }
+  const step = xmax > 10 ? 2 : 1; let g = '';
+  for (let x = 0; x <= xmax; x += step) g += `<line class="gr" x1="${X(x)}" x2="${X(x)}" y1="${y1}" y2="${y0}"/><text x="${X(x)}" y="${y0 + 14}" text-anchor="middle">${x}</text>`;
+  let dots = ''; for (let x = 0; x <= xmax; x++) { const y = a * Math.pow(b, x); if (y <= ymax) dots += `<circle class="pt" cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="2.6"/>`; }
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tráfego f(x) crescendo ao longo dos minutos, com a linha da capacidade de ${nf(L)} Gbps">${g}<line class="ax" x1="${x0}" x2="${x1}" y1="${y0}" y2="${y0}"/><line class="cap" x1="${x0}" x2="${x1}" y1="${Y(L)}" y2="${Y(L)}"/><text x="${x0 + 4}" y="${Y(L) - 5}" class="capt">capacidade L = ${nf(L)} Gbps</text><polyline class="ln" points="${pts.join(' ')}"/>${dots}<text x="${x1}" y="${H - 2}" text-anchor="end">tempo x (min)</text><text x="${x0 - 6}" y="${y0 + 3}" text-anchor="end">0</text></svg>`;
+};
+C.svgScatter = function (xs, ys, cap, xmax, fit) {
+  const W = 400, H = 186, x0 = 46, x1 = 388, y0 = 156, y1 = 12;
+  const ymin = Math.max(0, Math.floor(Math.min(...ys) * 0.7 / 50) * 50), ymax = Math.ceil(cap * 1.12 / 50) * 50;
+  const X = x => x0 + x / xmax * (x1 - x0), Y = y => y0 - (y - ymin) / (ymax - ymin) * (y0 - y1);
+  const step = xmax > 14 ? 4 : 2; let g = '';
+  for (let x = 0; x <= xmax; x += step) g += `<line class="gr" x1="${X(x)}" x2="${X(x)}" y1="${y1}" y2="${y0}"/><text x="${X(x)}" y="${y0 + 14}" text-anchor="middle">${x}</text>`;
+  g += `<text x="${x0 - 6}" y="${Y(ymin) + 3}" text-anchor="end">${ymin}</text>`;
+  let line = '';
+  if (fit) {
+    const xa = 0, xb = xmax;
+    line = `<line class="fit" x1="${X(xa)}" y1="${Y(fit.a + fit.b * xa).toFixed(1)}" x2="${X(xb)}" y2="${Y(fit.a + fit.b * xb).toFixed(1)}"/>`;
+    const xc = (cap - fit.a) / fit.b; line += `<circle class="hit" cx="${X(xc).toFixed(1)}" cy="${Y(cap).toFixed(1)}" r="4"/>`;
+  }
+  const dots = xs.map((x, k) => `<circle class="pt" cx="${X(x).toFixed(1)}" cy="${Y(ys[k]).toFixed(1)}" r="3.4"/>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Uso do disco nos últimos seis meses e capacidade de ${cap} GB">${g}<line class="ax" x1="${x0}" x2="${x1}" y1="${y0}" y2="${y0}"/><line class="cap" x1="${x0}" x2="${x1}" y1="${Y(cap)}" y2="${Y(cap)}"/><text x="${x0 + 4}" y="${Y(cap) - 5}" class="capt">capacidade = ${cap} GB</text>${line}${dots}<text x="${x1}" y="${H - 2}" text-anchor="end">mês x</text></svg>`;
+};
+const pp = v => v < 0 ? '(' + nf(v) + ')' : nf(v);
+const htab = (rows, cls) => '<div class="scroll"><table class="dt' + (cls ? ' ' + cls : '') + '">' + rows.map(r => '<tr><th>' + r[0] + '</th>' + r.slice(1).map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</table></div>';
+const vtab = (head, rows, foot) => '<div class="scroll"><table class="dt c"><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr>' + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + (foot ? '<tr class="tot">' + foot.map(c => '<td>' + c + '</td>').join('') + '</tr>' : '') + '</table></div>';
+function whyRow(n, e) {
+  const s_ = x => C.strLogic(x), v = x => VF(C.evalLogic(x, e));
+  switch (n.o) {
+    case '→': return `a condição ${s_(n.a)} é ${v(n.a)} e a consequência ${s_(n.b)} é ${v(n.b)}. A promessa foi quebrada, então a implicação é F.`;
+    case '∧': { const f = [n.a, n.b].filter(x => !C.evalLogic(x, e)); return `${f.map(x => s_(x) + ' é F').join(' e ')}, e um ∧ com alguma parte F é F.`; }
+    case '∨': return `${s_(n.a)} e ${s_(n.b)} são os dois F, então o ∨ é F.`;
+    case '↔': return `${s_(n.a)} é ${v(n.a)} e ${s_(n.b)} é ${v(n.b)}. Os valores são diferentes, então o ↔ é F.`;
+    case '¬': return `${s_(n.a)} é V, e a negação inverte para F.`;
+  }
+  return '';
+}
+const mx = rows => '<span class="mx"><table>' + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</table></span>';
+
+/* ====================================================================
+   DESAFIOS. Cada gerador recebe (r = sorteio, d = 0 fácil | 1 médio | 2 difícil)
+   e devolve: kind, sc (cenário), q (pergunta), hint, sol (passos), log, dados do tipo.
+   ==================================================================== */
+const L = [];
+
+/* 1 — Tabela-verdade */
+const MEAN = { P: 'Servidor Web', Q: 'Banco de Dados', R: 'Autenticação' };
+const RULE = { '¬': '¬A inverte o valor de A.', '∧': 'A ∧ B só é V quando A e B são V.', '∨': 'A ∨ B só é F quando A e B são F.', '→': 'A → B só é F quando A é V e B é F.', '↔': 'A ↔ B é V quando A e B têm o mesmo valor.' };
+const rulesOf = src => Object.keys(RULE).filter(o => src.includes(o)).map(o => RULE[o]);
+C.POOL1 = [
+  [['P → Q', 'se o Servidor Web está no ar, o Banco de Dados precisa estar no ar'], ['¬Q → ¬P', 'se o Banco de Dados caiu, o Servidor Web também precisa estar fora do ar'], ['P ∨ Q', 'pelo menos um dos dois precisa estar no ar'], ['P ↔ Q', 'o Web e o Banco precisam estar no mesmo estado: os dois no ar ou os dois fora']],
+  [['(P ∧ Q) → R', 'se o Web e o Banco estão no ar, a Autenticação precisa estar no ar'], ['(P ∨ Q) → R', 'se o Web ou o Banco estiver no ar, a Autenticação precisa estar no ar'], ['P → (Q ∧ R)', 'se o Web está no ar, o Banco e a Autenticação precisam estar no ar'], ['R → (P ∨ Q)', 'se a Autenticação está no ar, pelo menos o Web ou o Banco precisa estar no ar']],
+  [['(P → Q) ∧ (Q → R)', 'o Web depende do Banco, e o Banco depende da Autenticação'], ['(P ↔ Q) → R', 'se o Web e o Banco estão no mesmo estado, a Autenticação precisa estar no ar'], ['(P ∨ Q) ∧ ¬(Q ∧ R)', 'pelo menos o Web ou o Banco fica no ar, mas o Banco e a Autenticação nunca rodam juntos (conflito de porta)'], ['¬(P ∧ ¬R) ∧ (Q → P)', 'o Web nunca roda sem Autenticação, e o Banco só roda com o Web no ar']]
+];
+L.push({ phase: 1, title: 'Diagnóstico de intertravamento', gen(r, d) {
+  const [src, txt] = pick(r, C.POOL1[d]);
+  const vs = d === 0 ? ['P', 'Q'] : ['P', 'Q', 'R'];
+  const ast = C.parseLogic(src), rows = C.rowsFor(vs);
+  const expect = rows.map(row => C.evalLogic(ast, env(vs, row)));
+  const fr = rows.filter((_, k) => !expect[k]);
+  const cols = C.subs(ast).map(x => ({ s: x.s, vals: rows.map(row => C.evalLogic(x.n, env(vs, row))) }));
+  cols[cols.length - 1].main = true;
+  return {
+    kind: 'truth', vars: vs, rows, expect, formula: src,
+    sc: `O painel de intertravamento só libera o acesso dos clientes (L = V) quando a regra de segurança é respeitada. Cada subsistema é uma variável booleana: ${vs.map(v => v + ' = ' + MEAN[v]).join(', ')}, com V para “no ar” e F para “fora do ar”. A regra em vigor é L = ${src}, ou seja, ${txt}. O NullSet embaralhou os estados dos servidores, então qualquer combinação pode aparecer no painel.`,
+    q: 'Complete a coluna L para cada combinação (toque para alternar entre V e F) e valide a tabela.',
+    hint: rulesOf(src).join(' ') + ' Resolva primeiro o que está entre parênteses.',
+    sol: [`A regra é L = ${src}. Cada linha da tabela é uma situação possível dos servidores. Com ${vs.length} variáveis há 2^${vs.length} = ${rows.length} situações, e todas precisam ser testadas.`, `Conectivos desta regra: ${rulesOf(src).join(' ')}`, 'Monte uma coluna para cada pedaço da fórmula, de dentro para fora, como numa conta com parênteses: primeiro as negações e o que está entre parênteses, depois o conectivo principal. A última coluna é L:', ttHTML(vs, cols), `L é F em ${fr.length} das ${rows.length} situações: ${fr.map(row => rowTxt(vs, row)).join('; ')}. São exatamente as situações que violam a regra.`, `Por que, por exemplo, em ${rowTxt(vs, fr[0])}? Porque ${whyRow(ast, env(vs, fr[0]))}`],
+    log: 'regra de intertravamento corrompida. Revalide a tabela-verdade.'
+  };
+}});
+
+/* 2 — Firewall com conjuntos */
+const fmtSet = S => S.length ? '{' + S.join(', ') + '}' : '∅';
+const inter = (X, Y) => X.filter(v => Y.includes(v)), uni = (X, Y) => [...new Set([...X, ...Y])].sort((a, b) => a - b), dif = (X, Y) => X.filter(v => !Y.includes(v));
+const sameSet = (X, Y) => X.length === Y.length && X.every(v => Y.includes(v));
+C.OPS2 = [
+  [['A ∩ B', 'um IP que aparece na blacklist e também na rede interna é um invasor que já está dentro de casa, e todos eles devem ser bloqueados', (A, B, Cc) => { const x = inter(A, B); return { res: x, steps: [`A ∩ B reúne os elementos que estão em A e em B ao mesmo tempo: ${fmtSet(x)}.`] }; }, () => true]],
+  [['(A ∩ B) − C', 'os invasores internos (blacklist e rede interna ao mesmo tempo) devem ser bloqueados, mas alguns deles são parceiros com contrato e não podem cair', (A, B, Cc) => { const i = inter(A, B), x = dif(i, Cc); return { res: x, steps: [`Primeiro o parêntese: A ∩ B = ${fmtSet(i)} (estão na blacklist e na rede interna).`, `Depois retire os parceiros: ${fmtSet(i)} − ${fmtSet(Cc)} = ${fmtSet(x)}.`] }; }, (A, B, Cc) => inter(inter(A, B), Cc).length > 0]],
+  [['(A ∪ B) − C', 'a rede entrou em quarentena: todo IP da blacklist ou da rede interna deve ser isolado, exceto os parceiros', (A, B, Cc) => { const u = uni(A, B), x = dif(u, Cc); return { res: x, steps: [`Primeiro o parêntese: A ∪ B = ${fmtSet(u)} (estão em pelo menos um dos dois).`, `Depois retire os parceiros: (A ∪ B) − C = ${fmtSet(x)}.`] }; }, (A, B, Cc) => inter(uni(A, B), Cc).length > 0],
+   ['A ∪ (B − C)', 'a blacklist inteira deve ser bloqueada (até parceiros comprometidos), e na rede interna só os parceiros continuam liberados', (A, B, Cc) => { const dd = dif(B, Cc), x = uni(A, dd); return { res: x, steps: [`Primeiro o parêntese: B − C = ${fmtSet(dd)} (internos que não são parceiros).`, `Depois a união: A ∪ (B − C) = ${fmtSet(A)} ∪ ${fmtSet(dd)} = ${fmtSet(x)}.`, 'Repare que o parceiro que está na blacklist é bloqueado aqui, mas não seria em (A ∪ B) − C: os parênteses mudam o resultado.'] }; }, (A, B, Cc) => inter(A, Cc).length > 0 && inter(B, Cc).length > 0]]
+];
+L.push({ phase: 1, title: 'Firewall: filtrando IPs', gen(r, d) {
+  const [op, txt, fn, need] = pick(r, C.OPS2[d]);
+  for (let tries = 0; tries < 2000; tries++) {
+    const pool = shuffle(r, [...Array(253)].map((_, k) => k + 2)).slice(0, 8).sort((a, b) => a - b);
+    const mem = pool.map(() => 1 + Math.floor(r() * 7));
+    const A = pool.filter((_, k) => mem[k] & 1), B = pool.filter((_, k) => mem[k] & 2), Cc = pool.filter((_, k) => mem[k] & 4);
+    if (A.length < 3 || B.length < 3 || Cc.length < 2) continue;
+    if (!need(A, B, Cc)) continue;
+    const { res, steps } = fn(A, B, Cc);
+    if (res.length < 2 || res.length > (d === 2 ? 6 : 5) || sameSet(res, A) || sameSet(res, B)) continue;
+    return {
+      kind: 'chips', items: pool, expect: res, sets: { A, B, C: Cc }, op,
+      sc: `O NullSet está varrendo a rede, e o firewall trabalha com três listas de endereços. Os números abaixo são o último bloco de cada IP 10.0.0.x. A = blacklist ${fmtSet(A)}. B = rede interna ${fmtSet(B)}. C = parceiros ${fmtSet(Cc)}. Nesta situação, ${txt}.`,
+      q: `Aplique a regra ${op} e selecione os IPs que devem ser bloqueados.`,
+      hint: '∩ = está nos dois conjuntos; ∪ = está em pelo menos um; − = retira os elementos do segundo conjunto. Resolva primeiro o parêntese.',
+      sol: [op.includes('(') ? `A regra ${op} se resolve como uma conta: primeiro o parêntese, depois a operação de fora.` : `A regra ${op} tem uma única operação: a interseção, que funciona como o “e” da lógica.`, ...steps, 'Conferindo IP por IP (✓ = o IP pertence ao conjunto):', vtab(['IP', 'em A', 'em B', 'em C', 'bloquear?'], pool.map(x => ['10.0.0.' + x, A.includes(x) ? '✓' : '·', B.includes(x) ? '✓' : '·', Cc.includes(x) ? '✓' : '·', res.includes(x) ? '<b>sim</b>' : 'não'])), `Bloqueie ${res.map(x => '10.0.0.' + x).join(', ')}.`],
+      log: 'listas de acesso do firewall embaralhadas.'
+    };
+  }
+  throw Error('sets');
+}});
+
+/* 3 — DDoS exponencial */
+L.push({ phase: 2, title: 'DDoS exponencial', gen(r, d) {
+  const cfg = [{ a: [1, 2, 3], b: [2, 3], x: [4, 7] }, { a: [2, 3, 4, 5], b: [1.5, 2, 2.5, 3], x: [5, 9] }, { a: [3, 5, 8], b: [1.2, 1.25, 1.3, 1.4], x: [10, 16] }][d];
+  for (;;) {
+    const a = pick(r, cfg.a), b = pick(r, cfg.b), x = ri(r, cfg.x[0], cfg.x[1]);
+    const lo = a * Math.pow(b, x - 1), hi = a * Math.pow(b, x);
+    let Lc = lo + (hi - lo) * (0.3 + 0.4 * r());
+    const step = Lc >= 1000 ? 50 : Lc >= 200 ? 10 : 5; Lc = Math.round(Lc / step) * step;
+    if (!(Lc > lo * 1.03 && Lc < hi * 0.97)) continue;
+    const xs = Math.log(Lc / a) / Math.log(b);
+    return {
+      kind: 'num', a, b, L: Lc, fields: [{ label: 'x', ans: x, tol: 1e-6 }],
+      chart: C.svgGrowth(a, b, Lc, x + 1),
+      sc: `O tráfego malicioso que chega ao data center segue o modelo simplificado f(x) = ${a}·${nf(b)}ˣ Gbps, em que x é o minuto desde o início do ataque. O ${a} é o tráfego inicial e o ${nf(b)} é o fator de crescimento: a cada minuto o tráfego é multiplicado por ${nf(b)}, e não somado. A banda total suporta L = ${nf(Lc)} Gbps; acima disso, o data center cai.`,
+      q: 'Qual é o primeiro minuto inteiro x em que o tráfego ultrapassa a capacidade? Ative a mitigação nesse minuto.',
+      hint: d < 2 ? `Calcule f(0), f(1), f(2)… até passar de ${nf(Lc)}. Na calculadora: ${a}*${String(b)}^5, por exemplo.` : `Resolva ${a}·${nf(b)}ˣ > ${nf(Lc)} com logaritmo: x > ln(${nf(Lc)}/${a}) / ln(${nf(b)}).`,
+      sol: [`Queremos o primeiro minuto em que o tráfego passa da capacidade, isto é, o menor inteiro x com ${a}·${nf(b)}ˣ > ${nf(Lc)}.`, `Caminho 1, minuto a minuto: comece em f(0) = ${a} e multiplique por ${nf(b)} a cada minuto, até passar de ${nf(Lc)}.`, htab([['Minuto x', ...[...Array(x + 1)].map((_, k) => k)], ['f(x) em Gbps', ...[...Array(x + 1)].map((_, k) => k === x ? '<b>' + nf(a * Math.pow(b, k), 2) + '</b>' : nf(a * Math.pow(b, k), 2))]]), `Caminho 2, com logaritmo (mais rápido quando x é grande): divida os dois lados por ${a} para deixar a potência sozinha: ${nf(b)}ˣ > ${nf(Lc / a)}.`, `Aplique o logaritmo natural dos dois lados. Ele transforma o expoente em multiplicação, ln(${nf(b)}ˣ) = x·ln(${nf(b)}), e como ln(${nf(b)}) > 0 o sentido da desigualdade não muda: x > ln(${nf(Lc / a)}) / ln(${nf(b)}) ≈ ${nf(xs, 3)}.`, `x precisa ser inteiro e maior que ${nf(xs, 3)}, então arredondamos para cima: x = ${x}. No minuto ${x - 1} o tráfego (${nf(lo, 2)} Gbps) ainda cabe na banda; no minuto ${x} (${nf(hi, 2)} Gbps) já não cabe.`],
+      log: 'ataque de negação de serviço detectado. O tráfego está multiplicando.'
+    };
+  }
+}});
+
+/* 4 — Temperatura (2º grau) */
+L.push({ phase: 2, title: 'Thermal throttling', gen(r, d) {
+  const opts = [[{ a: 1, xv: [3, 4, 5, 6, 7, 8] }], [{ a: 0.5, xv: [4, 5, 6, 7, 8, 9] }, { a: 1, xv: [3, 4, 5, 6, 7, 8] }, { a: 2, xv: [2, 2.5, 3, 3.5, 4] }], [{ a: 0.2, xv: [5, 7.5, 10, 12.5] }, { a: 0.25, xv: [4, 6, 8, 10] }, { a: 0.4, xv: [5, 7.5, 10] }]][d];
+  const o = pick(r, opts), a = o.a, xv = pick(r, o.xv);
+  const Tm = ri(r, [16, 18, 24][d], [22, 26, 30][d]), delta = [2, 0.5, 0.05][d];
+  const b = +(-2 * a * xv).toFixed(4), c = +(a * xv * xv + Tm).toFixed(4), lim = +(Tm + delta).toFixed(4);
+  const h = Math.sqrt(delta / a), max = Math.ceil(2 * xv) + 1;
+  const T = x => a * x * x + b * x + c;
+  const poly = `${a === 1 ? '' : nf(a)}x² − ${nf(-b)}x + ${nf(c)}`;
+  return {
+    kind: 'slider', min: 0, max, step: 0.1, readout: d < 2, f: T, lim, xv, Tm, a, b, c,
+    sc: `Os racks estão superaquecendo. A temperatura segue o modelo didático T(x) = ${poly}, em °C, em que x é a rotação do cooler em centenas de RPM. Rotação baixa deixa o rack quente, mas rotação alta gasta energia e também aquece; como a > 0, existe uma rotação ideal no vértice da parábola.${d === 2 ? ' Neste nível o NullSet corrompeu o sensor: você só vê a rotação e precisa calcular o ponto ideal.' : ''}`,
+    q: `Ajuste o controle até T ≤ ${nf(lim)} °C e trave a rotação.`,
+    hint: 'O mínimo de ax² + bx + c (com a > 0) fica no vértice: x = −b / 2a.',
+    sol: [`Como a = ${nf(a)} é positivo, a parábola abre para cima: a temperatura cai até um ponto mínimo e depois volta a subir. Esse ponto é o vértice.`, `Rotação ideal: x_v = −b / 2a = −(${nf(b)}) / (2·${nf(a)}) = ${nf(-b)} / ${nf(2 * a)} = ${nf(xv)}, ou seja, ${nf(xv * 100)} RPM.`, `Temperatura no vértice: T(${nf(xv)}) = ${nf(a)}·${nf(xv)}² − ${nf(-b)}·${nf(xv)} + ${nf(c)} = ${nf(a * xv * xv)} − ${nf(-b * xv)} + ${nf(c)} = ${nf(Tm)} °C, abaixo do limite de ${nf(lim)} °C.`, `Quais rotações servem? Na forma do vértice, T(x) = ${nf(a)}·(x − ${nf(xv)})² + ${nf(Tm)}. A condição T ≤ ${nf(lim)} vira ${nf(a)}·(x − ${nf(xv)})² ≤ ${nf(delta)}, isto é, a distância até o vértice não pode passar de √(${nf(delta)} / ${nf(a)}) ≈ ${nf(h, 2)}. Servem rotações de ${nf(xv - h, 2)} a ${nf(xv + h, 2)}.`, d === 2 ? 'Neste nível a janela é estreita e o sensor estava corrompido: sem a leitura da temperatura, só acerta quem calcula o vértice.' : 'Repare que a janela fica centrada no vértice. É a simetria da parábola: pontos à mesma distância do vértice têm a mesma temperatura.'],
+    log: 'temperatura dos racks acima do limite.'
+  };
+}});
+
+/* 5 — Sistemas lineares */
+const det2 = M => M[0][0] * M[1][1] - M[0][1] * M[1][0];
+const det3 = M => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+const eqStr = (co, rhs, vs) => { let s = ''; co.forEach((c, k) => { if (!c) return; const ab = Math.abs(c), term = (ab === 1 ? '' : ab) + vs[k]; if (!s) s = (c < 0 ? '−' : '') + term; else s += (c < 0 ? ' − ' : ' + ') + term; }); return s + ' = ' + nf(rhs); };
+L.push({ phase: 2, title: 'Balanceamento de carga', gen(r, d) {
+  let M, s, vs;
+  for (;;) {
+    if (d < 2) {
+      vs = ['x', 'y']; s = [5 * ri(r, 4, 16), 5 * ri(r, 4, 16)]; if (s[0] === s[1]) continue;
+      M = d === 0 ? [[1, 1], [1, -1]] : [[pick(r, [2, 3]), pick(r, [1, 2])], [1, pick(r, [-1, -2])]];
+      if (!det2(M)) continue;
+    } else {
+      vs = ['x', 'y', 'z']; s = [0, 0, 0].map(() => 5 * ri(r, 4, 18)); if (new Set(s).size < 3) continue;
+      M = [[1, 1, 1], [0, 0, 0].map(() => ri(r, -3, 3)), [0, 0, 0].map(() => ri(r, -3, 3))];
+      if (M[1].filter(v => v).length < 2 || M[2].filter(v => v).length < 2) continue;
+      const D = det3(M); if (!D || Math.abs(D) > 40) continue;
+    }
+    break;
+  }
+  const n = vs.length, rhs = M.map(row => row.reduce((acc, c, k) => acc + c * s[k], 0));
+  const D = n === 2 ? det2(M) : det3(M);
+  const Di = vs.map((_, k) => { const Mk = M.map((row, i) => row.map((c, j) => j === k ? rhs[i] : c)); return n === 2 ? det2(Mk) : det3(Mk); });
+  const eqs = M.map((row, i) => eqStr(row, rhs[i], vs));
+  const matrix = `<div class="matrix scroll">${mx(M.map(row => row.map(c => nf(c))))}<span>·</span>${mx(vs.map(v => [v]))}<span>=</span>${mx(rhs.map(v => [nf(v)]))}</div>`;
+  let sc;
+  if (d === 0) sc = `O tráfego precisa ser dividido entre dois nós de borda sem sobrecarregar nenhum. Seja x a carga do nó 1 e y a carga do nó 2, em mil pacotes por segundo. Pelo canal principal passam ${nf(rhs[0])} mil pacotes por segundo no total, e o nó 1 deve receber ${rhs[1] >= 0 ? nf(rhs[1]) + ' a mais' : nf(-rhs[1]) + ' a menos'} que o nó 2. Isso gera o sistema ${eqs[0]} e ${eqs[1]}, escrito em forma de matriz A·x = b logo abaixo.`;
+  else if (d === 1) sc = `O tráfego precisa ser dividido entre dois nós de borda. Seja x a carga do nó 1 e y a carga do nó 2, em mil pacotes por segundo. Os pesos dos canais impõem duas condições: ${eqs[0]} e ${eqs[1]}. Em forma de matriz, A é a matriz dos coeficientes, x é o vetor das cargas e b é o vetor das condições.`;
+  else sc = `O NullSet derrubou o balanceador, e a carga precisa ser redistribuída entre três nós (x, y e z, em mil pacotes por segundo). O total que chega ao núcleo é ${nf(rhs[0])}, e os pesos dos canais impõem mais duas condições. O sistema completo é: ${eqs.join('; ')}. Considere que, em regime estacionário, tudo o que entra no núcleo sai pelos três nós.`;
+  const sol = ['Cada equação é uma condição que as cargas precisam cumprir ao mesmo tempo. Antes de resolver, verificamos se existe uma única solução.'];
+  const detTxt = n === 2
+    ? `det(A) = ${pp(M[0][0])}·${pp(M[1][1])} − ${pp(M[0][1])}·${pp(M[1][0])} = ${nf(D)}`
+    : `Expandindo pela primeira linha: det(A) = ${pp(M[0][0])}·[${pp(M[1][1])}·${pp(M[2][2])} − ${pp(M[1][2])}·${pp(M[2][1])}] − ${pp(M[0][1])}·[${pp(M[1][0])}·${pp(M[2][2])} − ${pp(M[1][2])}·${pp(M[2][0])}] + ${pp(M[0][2])}·[${pp(M[1][0])}·${pp(M[2][1])} − ${pp(M[1][1])}·${pp(M[2][0])}] = ${nf(D)}`;
+  sol.push(`${detTxt}. Como det(A) ≠ 0, as equações não se repetem nem se contradizem, e o sistema tem exatamente uma solução.`);
+  if (d === 0) sol.push(`Por eliminação: somando as duas equações, os termos +y e −y se cancelam e sobra 2x = ${nf(rhs[0] + rhs[1])}, então x = ${nf(s[0])}. Substituindo na primeira: y = ${nf(rhs[0])} − ${nf(s[0])} = ${nf(s[1])}.`);
+  if (d === 1) { const [p0, q0] = M[0], r1 = M[1][1]; sol.push(`Por eliminação: multiplique a segunda equação por ${p0} para igualar o coeficiente de x e subtraia da primeira. O x desaparece: (${nf(q0)} − ${nf(p0)}·${pp(r1)})·y = ${nf(rhs[0])} − ${nf(p0)}·${pp(rhs[1])}, ou seja, ${nf(q0 - p0 * r1)}y = ${nf(rhs[0] - p0 * rhs[1])}, e y = ${nf(s[1])}. Pela segunda equação, x = ${nf(rhs[1])} − ${pp(r1)}·${nf(s[1])} = ${nf(s[0])}.`); }
+  sol.push(`Pela regra de Cramer, cada incógnita é det(Aᵢ) / det(A), em que Aᵢ é a matriz A com a coluna daquela incógnita trocada pelo vetor b.`);
+  vs.forEach((v, k) => sol.push(`Trocando a coluna de ${v} por b: det(A${v}) = ${nf(Di[k])}, então ${v} = ${nf(Di[k])} / ${pp(D)} = ${nf(s[k])}.`));
+  const lhs = row => row.map((c, k) => [c, k]).filter(([c]) => c).map(([c, k], i) => { const ab = Math.abs(c), t = (ab === 1 ? '' : nf(ab) + '·') + nf(s[k]); return i === 0 ? (c < 0 ? '−' : '') + t : (c < 0 ? ' − ' : ' + ') + t; }).join('');
+  sol.push('Conferência em todas as equações: ' + M.map((row, i) => lhs(row) + ' = ' + nf(rhs[i]) + ' ✓').join('; ') + '.');
+  sol.push(`Resultado: ${vs.map((v, k) => `nó ${k + 1} (${v}) com ${nf(s[k])} mil pacotes por segundo`).join(', ')}.`);
+  return {
+    kind: 'num', M, rhs, solution: s, extra: matrix,
+    fields: vs.map((v, k) => ({ label: v, ans: s[k], tol: 1e-6 })),
+    sc, q: 'Resolva o sistema e informe a carga de cada nó.',
+    hint: d < 2 ? 'Some ou subtraia as equações para eliminar uma variável, ache a outra e substitua.' : 'Use a regra de Cramer: cada variável é det(Aᵢ) / det(A), em que Aᵢ troca a coluna da variável pelo vetor b.',
+    sol, log: 'balanceador de carga fora do ar.'
+  };
+}});
+
+/* 6 — Regressão linear (dashboard preditivo) */
+L.push({ phase: 2, title: 'Previsão de capacidade', gen(r, d) {
+  const xs = [1, 2, 3, 4, 5, 6], n = 6, Sx = 21, Sxx = 91;
+  for (;;) {
+    const bt = ri(r, 10, 25), at = ri(r, 100, 300), nz = [0, 6, 9][d];
+    const ys = xs.map(x => at + bt * x + (nz ? ri(r, -nz, nz) : 0));
+    const Sy = sum(ys), Sxy = sum(xs.map((x, k) => x * ys[k]));
+    const num = n * Sxy - Sx * Sy, den = n * Sxx - Sx * Sx, bh = num / den, ah = Sy / n - bh * Sx / n;
+    if (bh <= 3) continue;
+    const m = ri(r, 10, 20);
+    const cap = Math.round((ah + bh * (m - 1 + 0.25 + 0.5 * r())) / 10) * 10;
+    const xc = (cap - ah) / bh;
+    if (Math.ceil(xc) !== m || xc - (m - 1) < 0.15 || m - xc < 0.15) continue;
+    const table = `<div class="scroll"><table class="dt"><tr><th>Mês (x)</th>${xs.map(x => '<td>' + x + '</td>').join('')}</tr><tr><th>Uso em GB (y)</th>${ys.map(y => '<td>' + y + '</td>').join('')}</tr></table></div>` + (d === 1 ? `<p class="sums">n = 6 · Σx = 21 · Σx² = 91 · Σy = ${nf(Sy)} · Σxy = ${nf(Sxy)}</p>` : '');
+    const fields = d === 2 ? [{ label: 'b', ans: bh, tol: 0.02 }, { label: 'Mês', ans: m, tol: 1e-6 }] : [{ label: 'Mês', ans: m, tol: 1e-6 }];
+    return {
+      kind: 'num', xs, ys, cap, fit: { a: ah, b: bh }, month: m, fields, extra: table,
+      chart: C.svgScatter(xs, ys, cap, m + 2, null),
+      sc: `O dashboard preditivo mostra o uso do disco principal de armazenamento nos últimos seis meses. O NullSet está gravando lixo, e você precisa planejar a expansão antes do colapso. A capacidade do disco é ${cap} GB. Para prever quando ele lota, ajuste uma reta de tendência ŷ = a + b·x pelo método dos mínimos quadrados, em que x é o mês e ŷ é o uso previsto em GB.${d === 0 ? ' Neste nível os dados estão perfeitamente alinhados.' : ''}`,
+      q: d < 2 ? `Em que mês (número inteiro) o uso previsto atinge ou ultrapassa ${cap} GB?` : `Calcule o coeficiente angular b (GB por mês, com duas casas decimais) e o primeiro mês inteiro em que o uso previsto atinge ou ultrapassa ${cap} GB.`,
+      hint: d === 0 ? 'Os pontos estão em linha reta: o uso cresce o mesmo valor todo mês. Ache esse crescimento (b), o valor no mês 0 (a) e resolva a + b·x ≥ capacidade.' : 'b = (n·Σxy − Σx·Σy) / (n·Σx² − (Σx)²) e a = ȳ − b·x̄. Depois resolva a + b·x ≥ capacidade e arredonde para cima.',
+      sol: ['Monte uma tabela com x, y, x² e x·y e some cada coluna. Essas somas são tudo o que as fórmulas dos mínimos quadrados precisam:', vtab(['x (mês)', 'y (GB)', 'x²', 'x·y'], xs.map((x, k) => [x, ys[k], x * x, x * ys[k]]), ['Σx = 21', 'Σy = ' + nf(Sy), 'Σx² = 91', 'Σxy = ' + nf(Sxy)]), `Inclinação: b = (n·Σxy − Σx·Σy) / (n·Σx² − (Σx)²) = (6·${nf(Sxy)} − 21·${nf(Sy)}) / (6·91 − 21²) = ${nf(num)} / 105 ≈ ${nf(bh, 4)}. O uso cresce, em média, ${nf(bh, 2)} GB por mês.`, `Intercepto: a = ȳ − b·x̄, com x̄ = 21 / 6 = 3,5 e ȳ = ${nf(Sy)} / 6 ≈ ${nf(Sy / 6, 4)}. Então a ≈ ${nf(Sy / 6, 4)} − ${nf(bh, 4)}·3,5 ≈ ${nf(ah, 4)} GB. Essa conta faz a reta passar pelo ponto médio dos dados, (x̄, ȳ).`, `Reta de tendência: ŷ ≈ ${nf(ah, 2)} + ${nf(bh, 2)}·x. Para saber quando o disco lota, resolva ŷ ≥ ${cap}: x ≥ (${cap} − ${nf(ah, 2)}) / ${nf(bh, 2)} ≈ ${nf(xc, 3)}.`, `O mês é inteiro e no mês ${m - 1} o disco ainda não lotou, então arredondamos para cima: mês ${m}. Conferência: ŷ(${m - 1}) ≈ ${nf(ah + bh * (m - 1), 1)} < ${cap} e ŷ(${m}) ≈ ${nf(ah + bh * m, 1)} ≥ ${cap}.`, C.svgScatter(xs, ys, cap, m + 2, { a: ah, b: bh }), 'No gráfico, a linha tracejada é a reta ajustada e o círculo marca o ponto em que ela cruza a capacidade.'],
+      log: 'storage enchendo. Dashboard preditivo disponível.'
+    };
+  }
+}});
+
+/* 7 — Senhas (análise combinatória) */
+L.push({ phase: 3, title: 'Quebra de senha', gen(r, d) {
+  let sc, a1, s1, n, k2;
+  if (d === 0) {
+    const k = ri(r, 3, 5); n = ri(r, 4, 7); k2 = 2; a1 = Math.pow(10, k);
+    sc = `O cofre digital pede um PIN de ${k} dígitos (0 a 9), e os dígitos podem se repetir. Além disso, o protocolo de reset de emergência exige escolher ${k2} nós entre ${n} disponíveis, e a ordem da escolha não importa.`;
+    s1 = [`Cada uma das ${k} posições do PIN pode ser qualquer dígito de 0 a 9, inclusive repetido, então todas têm 10 opções. Pelo princípio multiplicativo: ${Array(k).fill(10).join('·')} = 10^${k} = ${nf(a1)} senhas.`];
+  } else if (d === 1) {
+    const k = ri(r, 3, 4); n = ri(r, 5, 8); k2 = ri(r, 2, 3); a1 = C.perm(10, k);
+    sc = `O cofre digital usa tokens de ${k} dígitos distintos (0 a 9), e a ordem importa (123 é diferente de 321). Além disso, o reset de emergência exige escolher ${k2} nós entre ${n}, sem importar a ordem da escolha.`;
+    s1 = [`Posição por posição: a 1ª tem 10 opções; a 2ª tem 9, porque o dígito já usado não pode repetir; a 3ª tem 8${k === 4 ? '; a 4ª tem 7' : ''}. Multiplicando: ${[...Array(k)].map((_, i) => 10 - i).join('·')} = ${nf(a1)} senhas.`, `Isso é o arranjo A(10, ${k}) = 10! / ${10 - k}!. É arranjo, e não combinação, porque a ordem importa: 123 e 321 são senhas diferentes.`];
+  } else {
+    const m = ri(r, 2, 3), j = ri(r, 2, 3), v = ri(r, 0, 1); n = ri(r, 6, 9); k2 = ri(r, 3, 4);
+    const L1 = C.perm(26, m), D1 = v ? 9 * C.perm(9, j - 1) : C.perm(10, j); a1 = L1 * D1;
+    sc = `O cofre exige uma chave com ${m} letras distintas (26 possíveis) seguidas de ${j} dígitos distintos (0 a 9); a ordem dos caracteres importa (ABC é diferente de BAC)${v ? ', e o primeiro dígito não pode ser 0' : ''}. Além disso, o reset exige escolher ${k2} nós entre ${n}, sem importar a ordem.`;
+    s1 = [`Letras: a 1ª tem 26 opções e cada letra seguinte tem uma a menos, porque não podem repetir: A(26, ${m}) = ${[...Array(m)].map((_, i) => 26 - i).join('·')} = ${nf(L1)}.`, v ? `Dígitos: o primeiro não pode ser 0, então tem 9 opções (1 a 9). O segundo pode ser 0, mas não pode repetir o primeiro, então também tem 9${j === 3 ? '; o terceiro tem 8' : ''}: ${[9, ...[...Array(j - 1)].map((_, i) => 9 - i)].join('·')} = ${nf(D1)}.` : `Dígitos: distintos e com ordem importando, A(10, ${j}) = ${[...Array(j)].map((_, i) => 10 - i).join('·')} = ${nf(D1)}.`, `Letras e dígitos são escolhas feitas uma depois da outra, então multiplicamos (princípio multiplicativo): ${nf(L1)} · ${nf(D1)} = ${nf(a1)} senhas.`];
+  }
+  const a2 = C.comb(n, k2);
+  return {
+    kind: 'num', fields: [{ label: 'Senhas', ans: a1, tol: 1e-6 }, { label: 'Formas', ans: a2, tol: 1e-6 }],
+    sc, q: 'Quantas senhas são possíveis? E de quantas formas se escolhem os nós do reset?',
+    hint: d === 0 ? 'Com repetição, cada posição tem 10 opções: multiplique. Para os nós, a ordem não importa: C(n,k) = n! / (k!(n−k)!). Na calculadora: C(6;2).' : d === 1 ? 'Ordem importa e sem repetição: arranjo A(n,k) = n! / (n−k)!. Ordem não importa: combinação C(n,k). Na calculadora: A(10;3) e C(6;2).' : 'Multiplique as opções de cada posição (princípio multiplicativo); letras não se repetem entre si, nem dígitos entre si. Para os nós, use C(n,k).',
+    sol: [...s1, `Nós do reset: escolher ${k2} nós entre ${n} forma um grupo, e a ordem da escolha não importa ({N1, N2} é o mesmo grupo que {N2, N1}). Por isso é combinação.`, `C(${n}, ${k2}) = A(${n}, ${k2}) / ${k2}! = ${nf(C.perm(n, k2))} / ${nf(C.fact(k2))} = ${nf(a2)}. Dividimos por ${k2}! porque cada grupo aparece ${k2}! vezes no arranjo, uma para cada ordem dos seus elementos.`],
+    log: 'cofre digital bloqueado. Chave de acesso desconhecida.'
+  };
+}});
+
+/* 8 — Discos RAID (probabilidade) */
+const binom = (n, k, p) => C.comb(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
+const RAID_TAIL = ' Considere que os discos falham de forma independente (uma simplificação: na prática, falhas podem ter causas comuns).';
+L.push({ phase: 3, title: 'Risco de falha de disco', gen(r, d) {
+  for (;;) {
+    const v = d === 0 ? pick(r, ['r0', 'r1']) : d === 1 ? 'r5' : pick(r, ['r5d', 'r6']);
+    let o;
+    if (v === 'r0') {
+      const n = ri(r, 2, 4), p = ri(r, 2, 10) / 100, ans = 1 - Math.pow(1 - p, n);
+      o = { ans, raid: 'RAID 0', n, sc: `O volume usa RAID 0 (striping) com ${n} discos: os dados ficam divididos entre eles, então a falha de qualquer disco causa perda de dados. Cada disco tem probabilidade ${nf(p)} de falhar até o backup.`,
+        hint: 'RAID 0 não tolera falhas: P(perda) = 1 − P(nenhum disco falha) = 1 − (1 − p)ⁿ.',
+        sol: ['O RAID 0 divide os dados entre os discos e não tolera nenhuma falha: basta um disco falhar para haver perda.', 'Calcular “pelo menos um falha” diretamente exigiria somar muitos casos (só o disco 1, só o 2, os dois…). Pelo complemento é mais curto: P(perda) = 1 − P(nenhum falha).', `Cada disco resiste com probabilidade 1 − ${nf(p)} = ${nf(1 - p)}. Como as falhas são independentes, a chance de todos os ${n} resistirem é o produto: ${nf(1 - p)}^${n} = ${nf(Math.pow(1 - p, n), 6)}.`, `P(perda) = 1 − ${nf(Math.pow(1 - p, n), 6)} ≈ ${nfx(ans, 4)}. Repare que é maior que a chance de um disco sozinho (${nf(p)}): mais discos sem redundância, mais risco.`] };
+    } else if (v === 'r1') {
+      const p1 = ri(r, 10, 30) / 100, p2 = ri(r, 10, 30) / 100, ans = p1 * p2;
+      o = { ans, raid: 'RAID 1', n: 2, sc: `O volume usa RAID 1 (espelhamento) com 2 discos antigos: cada um guarda uma cópia completa, então só há perda se os dois falharem. O disco A falha com probabilidade ${nf(p1)} e o disco B com ${nf(p2)} até o backup.`,
+        hint: 'No espelhamento só há perda se os dois falharem: eventos independentes se multiplicam, P(A e B) = P(A)·P(B).',
+        sol: ['No RAID 1 cada disco guarda uma cópia completa dos dados, então só há perda se os dois falharem.', `Como as falhas são independentes, a chance de as duas acontecerem é o produto: P(A e B) = ${nf(p1)} · ${nf(p2)} = ${nfx(ans, 4)}.`, `O espelhamento reduz muito o risco: cada disco sozinho falha com ${nf(p1)} ou ${nf(p2)}, mas os dois juntos só com ${nfx(ans, 4)}.`] };
+    } else if (v === 'r5') {
+      const n = ri(r, 3, 6), p = ri(r, 4, 15) / 100, P0 = Math.pow(1 - p, n), P1 = n * p * Math.pow(1 - p, n - 1), ans = 1 - P0 - P1;
+      o = { ans, raid: 'RAID 5', n, sc: `O volume usa RAID 5 com ${n} discos: a paridade distribuída permite perder 1 disco sem perder dados, mas 2 ou mais falhas causam perda. Cada disco falha com probabilidade ${nf(p)} até o backup.`,
+        hint: 'RAID 5 tolera 1 falha: P(perda) = 1 − P(0 falhas) − P(1 falha), com P(1) = n·p·(1 − p)ⁿ⁻¹.',
+        sol: ['O RAID 5 tolera 1 falha. Há perda com 2 ou mais falhas, e é mais curto calcular o oposto: P(perda) = 1 − P(0 falhas) − P(1 falha).', `P(0): todos os ${n} discos resistem, (1 − ${nf(p)})^${n} = ${nf(1 - p)}^${n} = ${nf(P0, 6)}.`, `P(1): exatamente um disco falha. Há C(${n}, 1) = ${n} escolhas de qual disco falha, e cada caso tem probabilidade ${nf(p)}·${nf(1 - p)}^${n - 1} (um falha, os outros ${n - 1} resistem). Então P(1) = ${n}·${nf(p)}·${nf(1 - p)}^${n - 1} = ${nf(P1, 6)}.`, `P(perda) = 1 − ${nf(P0, 6)} − ${nf(P1, 6)} ≈ ${nfx(ans, 4)}.`] };
+    } else if (v === 'r5d') {
+      const n = ri(r, 4, 8), q = ri(r, 1, 6) / 100, ans = 1 - Math.pow(1 - q, n - 1);
+      o = { ans, raid: 'RAID 5 degradado', n, cond: true, sc: `O volume usa RAID 5 com ${n} discos, e um deles já falhou: o arranjo está degradado e em reconstrução. Durante a reconstrução, cada um dos ${n - 1} discos restantes falha com probabilidade ${nf(q)}, e qualquer nova falha causa perda de dados.`,
+        hint: 'Dado que um disco já falhou, o RAID 5 já gastou sua tolerância: qualquer falha entre os n − 1 restantes causa perda. P = 1 − (1 − q)ⁿ⁻¹.',
+        sol: ['Probabilidade condicional: queremos P(perda | um disco já falhou), a chance de perder dados sabendo que um disco já caiu.', `Saber disso muda o cenário. O RAID 5 tolera só 1 falha, e ela já aconteceu; agora qualquer falha entre os ${n - 1} discos restantes causa perda.`, `Pelo complemento: P(nenhum dos ${n - 1} falha) = (1 − ${nf(q)})^${n - 1} = ${nf(Math.pow(1 - q, n - 1), 6)}.`, `P(perda | 1 falha) = 1 − ${nf(Math.pow(1 - q, n - 1), 6)} ≈ ${nfx(ans, 4)}.`, `Compare com o arranjo intacto: com os ${n} discos funcionando e a mesma probabilidade ${nf(q)}, seriam precisas duas falhas, e P(perda) seria ${nfx(1 - Math.pow(1 - q, n) - n * q * Math.pow(1 - q, n - 1), 4)}. Por isso a reconstrução é o momento mais arriscado de um RAID 5.`] };
+    } else {
+      const n = ri(r, 5, 8), p = ri(r, 8, 20) / 100, Pk = [0, 1, 2].map(k => binom(n, k, p)), ans = 1 - sum(Pk);
+      o = { ans, raid: 'RAID 6', n, sc: `O volume usa RAID 6 com ${n} discos: a dupla paridade tolera 2 falhas, e 3 ou mais causam perda de dados. Cada disco falha com probabilidade ${nf(p)} até o backup.`,
+        hint: 'RAID 6 tolera 2 falhas: P(perda) = 1 − P(0) − P(1) − P(2), com P(k) = C(n,k)·pᵏ·(1 − p)ⁿ⁻ᵏ.',
+        sol: ['O RAID 6 tolera 2 falhas. Há perda com 3 ou mais, então P(perda) = 1 − P(0) − P(1) − P(2).', 'Cada P(k) vem da distribuição binomial, P(k) = C(n, k)·pᵏ·(1 − p)ⁿ⁻ᵏ: C(n, k) conta quais discos falham, pᵏ é a chance de esses k falharem e (1 − p)ⁿ⁻ᵏ é a chance de os outros resistirem.', ...Pk.map((v_, k) => `P(${k}) = C(${n}, ${k})·${nf(p)}^${k}·${nf(1 - p)}^${n - k} = ${nf(C.comb(n, k))}·${nf(Math.pow(p, k), 6)}·${nf(Math.pow(1 - p, n - k), 6)} = ${nf(v_, 6)}.`), `P(perda) = 1 − ${Pk.map(v_ => nf(v_, 6)).join(' − ')} ≈ ${nfx(ans, 4)}.`] };
+    }
+    if (o.ans < 0.01 || o.ans > 0.9) continue;
+    return {
+      kind: 'num', variant: v, raid: o.raid, prob: o.ans, fields: [{ label: 'P(perda)', ans: o.ans, tol: 0.00051 }],
+      sc: 'A rotina crítica do banco de dados precisa rodar antes do próximo backup automático, e você precisa decidir se isola o armazenamento ou arrisca. ' + o.sc + RAID_TAIL,
+      q: o.cond ? 'Qual a probabilidade de perda de dados, dado que um disco já falhou? Responda entre 0 e 1, com 4 casas decimais.' : 'Qual a probabilidade de perda de dados até o backup? Responda entre 0 e 1, com 4 casas decimais.',
+      hint: o.hint, sol: [...o.sol, o.ans > 0.1 ? 'Risco alto: isole o volume antes de rodar a rotina crítica.' : 'Risco moderado: dá para rodar a rotina, mas monitore os discos.'],
+      log: 'discos instáveis no Cofre Central.'
+    };
+  }
+}});
+
+/* 9 — Equivalência lógica */
+C.POOL9 = [
+  [['¬(P ∨ Q)', '¬P ∧ ¬Q', ['¬P ∨ ¬Q', 'P ∧ Q', '¬P ∨ Q'], 'Lei de De Morgan: a negação de um OU vira um E das negações.',
+    '“Não é verdade que o Web ou o Banco está no ar” é o mesmo que “o Web está fora e o Banco está fora”. Em código, `!(a || b)` é igual a `!a && !b`.',
+    'Negar cada termo e esquecer de trocar o conectivo: ¬P ∨ ¬Q não é a negação de P ∨ Q.'],
+   ['¬(P ∧ Q)', '¬P ∨ ¬Q', ['¬P ∧ ¬Q', 'P ∨ Q', 'P → Q'], 'Lei de De Morgan: a negação de um E vira um OU das negações.',
+    '“Não é verdade que tenho crachá e senha” é o mesmo que “me falta o crachá ou me falta a senha”. Em código, `!(a && b)` é igual a `!a || !b`.',
+    'Negar cada termo e esquecer de trocar o conectivo: ¬P ∧ ¬Q exige que faltem os dois, o que é forte demais.']],
+  [['P → Q', '¬P ∨ Q', ['P ∨ ¬Q', '¬P ∧ Q', 'Q → P'], 'Condicional como disjunção: P → Q só falha quando P é V e Q é F, exatamente como ¬P ∨ Q.',
+    '“Se chove, levo guarda-chuva” só é quebrada quando chove e eu não levo. É o mesmo que dizer “não chove, ou levo guarda-chuva”.',
+    'Achar que P → Q equivale a Q → P. “Se chove, levo guarda-chuva” não diz que só levo guarda-chuva quando chove.'],
+   ['P → Q', '¬Q → ¬P', ['Q → P', '¬P → ¬Q', 'P ∧ ¬Q'], 'Contrapositiva: trocar os lados e negar os dois mantém o valor. A recíproca (Q → P) e a inversa (¬P → ¬Q) não são equivalentes.',
+    '“Se é administrador, tem acesso total” equivale a “se não tem acesso total, não é administrador”. Já “se tem acesso total, é administrador” (a recíproca) diz outra coisa.',
+    'Confundir a contrapositiva (¬Q → ¬P) com a recíproca (Q → P) ou com a inversa (¬P → ¬Q). Só a contrapositiva troca os lados e nega os dois.'],
+   ['¬(P ∧ ¬Q)', 'P → Q', ['¬P ∧ Q', 'P ∨ ¬Q', 'Q → P'], 'De Morgan dá ¬P ∨ Q, que é a forma de disjunção de P → Q.',
+    '“Nunca acontece de o Web estar no ar sem o Banco” é o mesmo que “se o Web está no ar, o Banco está no ar”.',
+    'Aplicar De Morgan e esquecer que ¬(¬Q) = Q: a dupla negação se cancela.']],
+  [['¬(P → Q)', 'P ∧ ¬Q', ['¬P ∨ Q', '¬P ∧ Q', 'P ∨ ¬Q'], 'Negação da condicional: P → Q ≡ ¬P ∨ Q; negando com De Morgan, sobra P ∧ ¬Q.',
+    'A única forma de quebrar “se chove, levo guarda-chuva” é chover e eu não levar. Por isso a negação da promessa é “chove e não levo”.',
+    'Achar que a negação de uma implicação é outra implicação, como P → ¬Q. A negação de “se P, então Q” é uma afirmação com ∧: P aconteceu e Q não.'],
+   ['P ↔ Q', '(P → Q) ∧ (Q → P)', ['(P → Q) ∨ (Q → P)', 'P ∧ Q', '(P ∧ Q) ∨ ¬P'], 'Bicondicional: vale nos dois sentidos, então é a conjunção das duas condicionais.',
+    '“A porta abre se e somente se o crachá é válido” diz duas coisas: crachá válido abre a porta, e a porta só abre com crachá válido.',
+    'Ligar as duas condicionais com ∨. (P → Q) ∨ (Q → P) é sempre V, porque uma das duas sempre vale.'],
+   ['¬(P ↔ Q)', '(P ∧ ¬Q) ∨ (¬P ∧ Q)', ['(P ∧ Q) ∨ (¬P ∧ ¬Q)', '¬P ↔ ¬Q', 'P ∨ Q'], 'Negar a bicondicional dá o ou exclusivo: exatamente um dos dois é V.',
+    '“Os dois servidores não estão no mesmo estado” significa que exatamente um deles está no ar. Em código, é o ou exclusivo: `a !== b`.',
+    'Confundir com P ∨ Q, que também é V quando os dois estão no ar.'],
+   ['P → (Q → R)', '(P ∧ Q) → R', ['(P → Q) → R', '(P ∨ Q) → R', 'Q → (P ∧ R)'], 'Exportação: “se P, então (se Q, então R)” equivale a “se P e Q, então R”.',
+    '“Se é dia útil, então, se for horário comercial, o suporte atende” é o mesmo que “se é dia útil e horário comercial, o suporte atende”.',
+    'Mover os parênteses para a esquerda: (P → Q) → R não é a mesma regra.']]
+];
+L.push({ phase: 3, title: 'Desarmando o contador', gen(r, d) {
+  const [src, good, bad, law, exTxt, pit] = pick(r, C.POOL9[d]);
+  const distract = bad.filter(x => !C.equiv(src, x));
+  const opts = shuffle(r, [good, ...distract]);
+  const vs = C.varsOf(src + good + bad.join(''));
+  const why = distract.map(x => {
+    const a = C.column(src, vs), b = C.column(x, vs), k = a.findIndex((v, i) => v !== b[i]);
+    return `${x} falha em ${rowTxt(vs, C.rowsFor(vs)[k])}: o original dá ${VF(a[k])} e ela dá ${VF(b[k])}.`;
+  });
+  return {
+    kind: 'mc', options: opts, correct: opts.indexOf(good), src, good,
+    sc: `Você chegou ao código-fonte do vírus. O contador regressivo é protegido pela condição ${src}. O terminal de desarme só aceita uma expressão logicamente equivalente escrita de outra forma: mesma tabela-verdade, conectivos diferentes. P e Q${vs.includes('R') ? ' e R' : ''} são subsistemas que o vírus liga e desliga.`,
+    q: `Qual expressão é logicamente equivalente a ${src}?`,
+    hint: law.split(':')[0] + '. Monte a tabela-verdade das duas expressões e compare as colunas.',
+    law, exTxt, pit,
+    sol: [`${src} ≡ ${good}. ${law}`, 'Para confirmar, monte a tabela-verdade das duas expressões:', ttHTML(vs, [{ s: src, vals: C.column(src, vs), main: true }, { s: good, vals: C.column(good, vs), main: true }]), 'As duas colunas são iguais em todas as linhas, então as expressões são equivalentes.', ...(why.length ? ['Cada alternativa errada tem pelo menos uma linha diferente, um contraexemplo:', ...why] : [])],
+    log: 'contador regressivo protegido por condição lógica.'
+  };
+}});
+
+/* ---------- O conceito, um exemplo simples e o erro comum de cada nó ---------- */
+const CONNECTIVE = {
+  '¬': '¬ (não) inverte o valor: ¬V = F e ¬F = V.',
+  '∧': '∧ (e) só é V quando as duas partes são V.',
+  '∨': '∨ (ou) é V quando pelo menos uma parte é V; só é F quando as duas são F.',
+  '→': '→ (se… então) é uma promessa: só é F quando a condição é V e a consequência é F.',
+  '↔': '↔ (se e somente se) é V quando as duas partes têm o mesmo valor.'
+};
+const setOf = arr => '{' + arr.join(', ') + '}';
+
+/* 1 — Tabela-verdade */
+L[0].learn = function (o) {
+  const ops = Object.keys(CONNECTIVE).filter(c => o.formula.includes(c));
+  const EX = [
+    ['P ∧ Q', 'Regra da porta do data center: L = P ∧ Q, em que P = “tenho crachá” e Q = “sei a senha”.', 'Só há uma linha V: com crachá e com senha. Faltando qualquer um dos dois, a porta não abre.'],
+    ['P → Q', 'Regra do dia a dia: L = P → Q, em que P = “está chovendo” e Q = “levo guarda-chuva”.', 'A única linha F é P = V e Q = F: choveu e você não levou o guarda-chuva, então a promessa foi quebrada. Quando não chove (P = F), a promessa nem foi testada, e a implicação vale V.'],
+    ['P ∨ Q', 'Regra de disponibilidade: L = P ∨ Q, em que P = “servidor 1 no ar” e Q = “servidor 2 no ar”.', 'Só há uma linha F: os dois servidores caídos. Se pelo menos um funciona, o site fica no ar, inclusive quando os dois funcionam.']
+  ];
+  const ex = EX.find(e => e[0] !== o.formula);
+  const pit = ops.includes('→') ? 'Marcar P → Q como F quando P é F. Se a condição não aconteceu, a regra não foi quebrada, então o resultado é V.'
+    : ops.includes('↔') ? 'Confundir ↔ com ∧: P ↔ Q também é V quando P e Q são os dois F.'
+    : 'Tratar ∨ como “um ou outro, mas não os dois”. No ∨ da lógica, os dois V também dão V.';
+  return {
+    concept: [
+      'Uma proposição é uma afirmação que só pode ser verdadeira (V) ou falsa (F), como “o Servidor Web está no ar”. Os conectivos ¬, ∧, ∨, → e ↔ juntam proposições simples em regras compostas, e o valor da regra depende só dos valores das partes.',
+      'A tabela-verdade lista todas as combinações possíveis das variáveis e o valor da regra em cada uma. Com n variáveis são 2ⁿ linhas, porque cada variável nova dobra o número de casos: 2 variáveis dão 4 linhas, 3 dão 8. Em segurança, isso garante que nenhuma situação dos servidores fica sem teste.',
+      'Nesta regra aparecem: ' + ops.map(c => CONNECTIVE[c]).join(' ')
+    ],
+    example: [ex[1], ttHTML(['P', 'Q'], [{ s: ex[0], vals: C.column(ex[0], ['P', 'Q']), main: true }]), ex[2], o.vars.length === 3 ? 'Com três variáveis o método é o mesmo; a tabela só fica com 2³ = 8 linhas.' : ''].filter(Boolean),
+    pitfall: pit
+  };
+};
+
+/* 2 — Conjuntos */
+L[1].learn = function () {
+  const A = [1, 2, 3, 4], B = [3, 4, 5], Cc = [4, 6];
+  const i = inter(A, B), u = uni(A, B);
+  return {
+    concept: [
+      'Um conjunto é uma coleção de elementos sem repetição e sem ordem. Aqui, cada lista do firewall é um conjunto de endereços IP, e uma regra de bloqueio é uma expressão que combina esses conjuntos.',
+      'Cada operação responde a uma pergunta. A interseção A ∩ B reúne o que está em A e também em B. A união A ∪ B reúne o que está em pelo menos um dos dois. A diferença A − B reúne o que está em A, mas não em B. Elas correspondem aos conectivos lógicos ∧, ∨ e “e não”.',
+      'Como na aritmética, os parênteses dizem o que fazer primeiro. Um jeito seguro de resolver é testar elemento por elemento: para cada IP, pergunte se ele está em A, em B e em C, e aplique a regra.'
+    ],
+    example: [
+      `Pense em A como as pessoas com crachá e B como as pessoas dentro do prédio: A ∩ B são as que estão no prédio com crachá, e B − A são as que estão no prédio sem crachá. Com números: A = ${setOf(A)}, B = ${setOf(B)} e C = ${setOf(Cc)}.`,
+      htab([['A ∩ B', setOf(i) + ' (estão nos dois)'], ['A ∪ B', setOf(u) + ' (estão em pelo menos um)'], ['A − B', setOf(dif(A, B)) + ' (estão em A, mas não em B)'], ['(A ∩ B) − C', setOf(i) + ' − ' + setOf(Cc) + ' = ' + setOf(dif(i, Cc))]], 'l')
+    ],
+    pitfall: `Ignorar os parênteses. No exemplo, (A ∪ B) − C = ${setOf(dif(u, Cc))}, mas A ∪ (B − C) = ${setOf(uni(A, dif(B, Cc)))}: o elemento 4 muda de lado.`
+  };
+};
+
+/* 3 — Exponencial */
+L[2].learn = function () {
+  const f = k => 2 * Math.pow(3, k);
+  let xe = 0; while (f(xe) <= 100) xe++;
+  let xl = 0; while (2 + 4 * xl <= 100) xl++;
+  return {
+    concept: [
+      'Numa função exponencial f(x) = a·bˣ, a variável x fica no expoente. O número a é o valor inicial, porque f(0) = a·b⁰ = a, e b é o fator de crescimento: a cada unidade de x, o valor é multiplicado por b.',
+      'Com b > 1, o crescimento parece pequeno no começo e explode depois. É isso que a diferencia de uma função linear, que soma sempre o mesmo valor. Por isso, neste modelo simplificado de ataque DDoS, a banda parece segura nos primeiros minutos e cai de repente.',
+      'Para descobrir quando f(x) passa de um limite L, há dois caminhos: testar minuto a minuto, ou isolar a potência e usar logaritmo, que “traz o expoente para baixo”: ln(bˣ) = x·ln(b).'
+    ],
+    example: [
+      'Tráfego f(x) = 2·3ˣ e capacidade de 100 Gbps.',
+      htab([['Minuto x', 0, 1, 2, 3, 4], ['f(x)', ...[0, 1, 2, 3, 4].map(k => k === xe ? '<b>' + f(k) + '</b>' : f(k))]]),
+      `O tráfego passa de 100 no minuto ${xe}. Pelo logaritmo: 3ˣ > 50, então x > ln(50) / ln(3) ≈ ${nf(Math.log(50) / Math.log(3), 2)}, e o primeiro inteiro é ${xe}.`,
+      `Compare com uma função linear que começa igual, g(x) = 2 + 4x (no primeiro minuto as duas dão 6). Somando 4 por minuto, ela só passaria de 100 no minuto ${xl}.`
+    ],
+    pitfall: `Arredondar para baixo. Se x > ${nf(Math.log(50) / Math.log(3), 2)}, no minuto ${xe - 1} o tráfego ainda não passou do limite; a resposta é o próximo inteiro.`
+  };
+};
+
+/* 4 — 2º grau */
+L[3].learn = function () {
+  const T = x => x * x - 6 * x + 20;
+  return {
+    concept: [
+      'Uma função do 2º grau tem a forma T(x) = ax² + bx + c, e o gráfico dela é uma parábola. O sinal de a define a abertura: com a > 0, ela abre para cima e tem um ponto mais baixo; com a < 0, abre para baixo e tem um ponto mais alto.',
+      'Esse ponto extremo é o vértice, em x_v = −b / 2a. A fórmula vem da simetria: a parábola vale c em x = 0 e também em x = −b/a (nesses dois pontos, ax² + bx = 0), e o vértice fica exatamente no meio deles.',
+      'No modelo didático do rack, x é a rotação do cooler. Pouca rotação não resfria; rotação demais consome energia e aquece o equipamento. Como a > 0, existe uma rotação que deixa a temperatura mínima: o vértice.'
+    ],
+    example: [
+      'T(x) = x² − 6x + 20. Aqui a = 1, b = −6 e c = 20.',
+      `x_v = −(−6) / (2·1) = 3, e T(3) = 9 − 18 + 20 = ${T(3)} °C.`,
+      htab([['x', 0, 1, 2, 3, 4, 5, 6], ['T(x)', ...[0, 1, 2, 3, 4, 5, 6].map(x => x === 3 ? '<b>' + T(x) + '</b>' : T(x))]]),
+      'Os valores se repetem dos dois lados de x = 3 (15 em x = 1 e x = 5; 20 em x = 0 e x = 6). É a simetria da parábola, e o mínimo fica no meio.'
+    ],
+    pitfall: 'Errar o sinal em −b / 2a. Se b é negativo, −b fica positivo: com b = −6, x_v = 6 / 2 = 3, e não −3.'
+  };
+};
+
+/* 5 — Sistemas lineares */
+L[4].learn = function (o, d) {
+  return {
+    concept: [
+      'Um sistema linear é um conjunto de equações em que as incógnitas só aparecem multiplicadas por números, sem potências nem produtos entre elas. Cada equação é uma condição, e a solução é o conjunto de valores que cumpre todas ao mesmo tempo.',
+      'Na forma matricial A·x = b, a matriz A guarda os coeficientes, o vetor x guarda as incógnitas (as cargas dos nós) e o vetor b guarda o resultado de cada condição. O determinante de A diz se a solução é única: se det(A) ≠ 0, há exatamente uma.',
+      d < 2 ? 'Com duas equações, a eliminação é o caminho mais curto: some ou subtraia as equações, multiplicando uma delas se preciso, até sumir uma incógnita. A regra de Cramer chega ao mesmo resultado com determinantes.'
+        : 'Com três equações, a regra de Cramer organiza a conta: cada incógnita é det(Aᵢ) / det(A), em que Aᵢ é a matriz A com a coluna daquela incógnita trocada pelo vetor b.',
+      'O modelo vem da conservação do fluxo: em regime estacionário, tudo o que entra num nó intermediário precisa sair.'
+    ],
+    example: [
+      'x + y = 10 e x − y = 2. Interpretação: chegam 10 mil pacotes por segundo, e o nó 1 deve receber 2 mil a mais que o nó 2.',
+      'Por eliminação: somando as duas equações, y desaparece e sobra 2x = 12, então x = 6. Voltando à primeira, 6 + y = 10, e y = 4.',
+      'Pela regra de Cramer: det(A) = 1·(−1) − 1·1 = −2. Trocando a coluna de x por b, det(Ax) = 10·(−1) − 1·2 = −12, e x = −12 / −2 = 6. Trocando a coluna de y, det(Ay) = 1·2 − 10·1 = −8, e y = −8 / −2 = 4.',
+      'Conferência: 6 + 4 = 10 e 6 − 4 = 2.'
+    ],
+    pitfall: 'Errar o sinal de um coeficiente negativo, ou trocar a coluna errada na regra de Cramer. Sempre confira a resposta substituindo em todas as equações.'
+  };
+};
+
+/* 6 — Regressão linear */
+L[5].learn = function () {
+  const xs = [1, 2, 3], ys = [2, 4, 5], n = 3;
+  const Sx = sum(xs), Sy = sum(ys), Sxx = sum(xs.map(x => x * x)), Sxy = sum(xs.map((x, k) => x * ys[k]));
+  const b = (n * Sxy - Sx * Sy) / (n * Sxx - Sx * Sx), a = Sy / n - b * Sx / n;
+  const xc = (10 - a) / b, m = Math.ceil(xc);
+  return {
+    concept: [
+      'A regressão linear encontra a reta ŷ = a + b·x que melhor acompanha um conjunto de pontos. Aqui x é o mês e ŷ é o uso previsto do disco. O coeficiente b é a inclinação, quanto o uso cresce em média por mês, e a é o valor estimado no mês 0.',
+      '“Melhor” tem um sentido preciso: o método dos mínimos quadrados escolhe a e b que tornam mínima a soma dos quadrados dos resíduos, as distâncias verticais entre cada ponto e a reta. Os quadrados impedem que erros para cima e para baixo se cancelem.',
+      'As fórmulas são b = (n·Σxy − Σx·Σy) / (n·Σx² − (Σx)²) e a = ȳ − b·x̄, e a reta sempre passa pelo ponto médio (x̄, ȳ). Usar a reta para meses futuros é uma extrapolação: ela supõe que a tendência continua.'
+    ],
+    example: [
+      'Três meses de uso: (1, 2), (2, 4) e (3, 5), em GB.',
+      vtab(['x', 'y', 'x²', 'x·y'], xs.map((x, k) => [x, ys[k], x * x, x * ys[k]]), ['Σx = ' + Sx, 'Σy = ' + Sy, 'Σx² = ' + Sxx, 'Σxy = ' + Sxy]),
+      `b = (3·${Sxy} − ${Sx}·${Sy}) / (3·${Sxx} − ${Sx}²) = ${nf(n * Sxy - Sx * Sy)} / ${nf(n * Sxx - Sx * Sx)} = ${nf(b)}. a = ${Sy}/3 − ${nf(b)}·2 ≈ ${nf(a, 2)}. A reta é ŷ ≈ ${nf(a, 2)} + ${nf(b)}·x.`,
+      `Quando ŷ chega a 10 GB? ${nf(a, 2)} + ${nf(b)}·x ≥ 10, então x ≥ ${nf(xc, 2)}, ou seja, no mês ${m}.`
+    ],
+    pitfall: 'Arredondar b cedo demais. Um erro pequeno na inclinação vira um erro grande quando a reta é estendida por muitos meses; faça as contas com várias casas e arredonde só no fim.'
+  };
+};
+
+/* 7 — Combinatória */
+L[6].learn = function () {
+  const S = ['A', 'B', 'C'], rep_ = [], arr = [], comb = [];
+  S.forEach(x => S.forEach(y => { rep_.push(x + y); if (x !== y) arr.push(x + y); if (x < y) comb.push('{' + x + ', ' + y + '}'); }));
+  return {
+    concept: [
+      'O princípio multiplicativo diz que, se uma escolha tem m opções e a seguinte tem n, as duas juntas têm m·n possibilidades. Montar uma senha é fazer uma escolha por posição e multiplicar as opções.',
+      'Quando a ordem importa e não há repetição, cada escolha tira uma opção da próxima: é o arranjo, A(n, k) = n·(n − 1)·…·(n − k + 1) = n! / (n − k)!. Em senhas a ordem importa, porque 123 e 321 abrem cofres diferentes.',
+      'Quando a ordem não importa, como ao escolher um grupo de nós, usamos a combinação, C(n, k) = n! / (k!·(n − k)!). Ela é o arranjo dividido por k!, porque cada grupo aparece k! vezes no arranjo, uma para cada ordem dos seus elementos.'
+    ],
+    example: [
+      'Escolher 2 letras entre A, B e C:',
+      htab([[`Com repetição, ordem importa: 3·3 = ${rep_.length}`, rep_.join(' ')], [`Sem repetição, ordem importa (arranjo): 3·2 = ${arr.length}`, arr.join(' ')], [`Sem ordem (combinação): ${arr.length} / 2! = ${comb.length}`, comb.join(' ')]], 'l'),
+      'No arranjo, AB e BA contam separado. Na combinação, os dois viram o mesmo grupo {A, B}, por isso o total cai pela metade (2! = 2 ordens de cada grupo).'
+    ],
+    pitfall: 'Usar combinação para senhas. Se mudar a ordem dos caracteres muda a senha, é arranjo (ou princípio multiplicativo), e não combinação.'
+  };
+};
+
+/* 8 — Probabilidade e RAID */
+L[7].learn = function (o, d) {
+  const concept = [
+    'Probabilidade mede a chance de um evento, de 0 (impossível) a 1 (certo). Se dois eventos são independentes, a chance de os dois acontecerem é o produto: P(A e B) = P(A)·P(B). O cenário supõe discos independentes, uma simplificação.',
+    'Muitas vezes é mais fácil calcular o oposto. O complemento de “pelo menos um falha” é “nenhum falha”, então P(pelo menos um) = 1 − P(nenhum).',
+    'Um RAID combina vários discos e tolera certo número de falhas: o RAID 0 não tolera nenhuma, o RAID 1 com 2 discos e o RAID 5 toleram 1, e o RAID 6 tolera 2. Só há perda de dados quando falham mais discos do que a tolerância.'
+  ];
+  if (o.variant === 'r5' || o.variant === 'r6') concept.push('Para a chance de exatamente k falhas entre n discos iguais, usamos a distribuição binomial: P(k) = C(n, k)·pᵏ·(1 − p)ⁿ⁻ᵏ. C(n, k) conta quais discos falham, pᵏ é a chance de esses falharem e (1 − p)ⁿ⁻ᵏ é a chance de os outros resistirem.');
+  if (o.variant === 'r5d') concept.push('A probabilidade condicional P(A | B) é a chance de A sabendo que B já aconteceu. Saber que um disco já falhou muda o cenário: o RAID 5 gastou sua tolerância, e agora qualquer nova falha causa perda.');
+  let example;
+  if (d === 0) {
+    example = [
+      'Dois discos, cada um com chance 0,1 de falhar.',
+      `Os dois falham (perda num RAID 1): 0,1·0,1 = ${nf(0.1 * 0.1)}.`,
+      `Pelo menos um falha (perda num RAID 0): 1 − 0,9·0,9 = 1 − ${nf(0.81)} = ${nf(1 - 0.81)}.`,
+      `Somar daria 0,1 + 0,1 = 0,2, que conta duas vezes o caso em que os dois falham: 0,2 − ${nf(0.01)} = ${nf(0.19)}.`
+    ];
+  } else {
+    const P0 = Math.pow(0.9, 3), P1 = 3 * 0.1 * 0.81, loss = 1 - P0 - P1, cond = 1 - 0.81;
+    example = [
+      'Três discos em RAID 5, cada um com chance 0,1 de falhar. O RAID 5 tolera 1 falha.',
+      `P(0) = 0,9³ = ${nf(P0)}. P(1) = 3·0,1·0,9² = ${nf(P1)}. P(perda) = 1 − ${nf(P0)} − ${nf(P1)} = ${nf(loss)}.`,
+      `Se um dos três já falhou, os dois restantes não podem falhar: P(perda | 1 falha) = 1 − 0,9² = ${nf(cond)}, quase ${Math.round(cond / loss)} vezes mais que ${nf(loss)}.`
+    ];
+    if (o.variant === 'r6') example.push('No RAID 6 a ideia é a mesma, só que ele tolera 2 falhas: também se subtrai P(2).');
+  }
+  return {
+    concept, example,
+    pitfall: o.variant === 'r5d' ? 'Usar a probabilidade do arranjo intacto. Depois que um disco falhou, a pergunta muda: só importam os discos restantes, e nenhum deles pode falhar.'
+      : 'Somar as probabilidades de falha. 0,1 + 0,1 = 0,2 não é a chance de pelo menos um falhar, porque conta duas vezes o caso em que os dois falham.'
+  };
+};
+
+/* 9 — Equivalência */
+L[8].learn = function (o) {
+  return {
+    concept: [
+      'Duas expressões são logicamente equivalentes (≡) quando têm o mesmo valor em todas as linhas da tabela-verdade. A equivalência permite reescrever uma regra sem mudar o que ela faz, como simplificar a condição de um if num programa.',
+      'Para provar uma equivalência, basta montar a tabela das duas expressões e comparar as colunas. Para provar que não são equivalentes, basta achar uma linha em que elas diferem, um contraexemplo.',
+      o.law
+    ],
+    example: [o.exTxt],
+    pitfall: o.pit
+  };
+};
+
+C.LEVELS = L;
+C.PHASES = {
+  1: { name: 'Setor de Borda', story: 'O tráfego externo bate nos gateways de entrada. O NullSet corrompeu a regra de intertravamento e embaralhou as listas do firewall. Restaure a lógica da borda antes que os pacotes maliciosos contaminem a rede.', concepts: 'Lógica proposicional · Teoria dos conjuntos' },
+  2: { name: 'Núcleo de Roteamento', story: 'Você atravessou a borda, mas o NullSet respondeu com um ataque de negação de serviço. O tráfego explode, os racks esquentam, a carga está desequilibrada e o storage enche sem parar. Estabilize o núcleo antes que os servidores físicos derretam.', concepts: 'Função exponencial · Função do 2º grau · Sistemas lineares · Regressão linear' },
+  3: { name: 'Cofre Central', story: 'O código-fonte do Protocolo de Colapso Lógico está guardado no Cofre Central. Quebre a chave de acesso, decida se os discos aguentam a rotina crítica e desarme o contador de vez.', concepts: 'Análise combinatória · Probabilidade · Equivalências lógicas' }
+};
+C.genAll = function (code, d) { const s = C.seed(code); return L.map((lv, k) => { const o = lv.gen(C.rng((s + k * 7919 + d * 104729) >>> 0), d); o.learn = lv.learn(o, d); return o; }); };
+
+/* ---------- correção das respostas ---------- */
+C.check = function (lv, resp) {
+  switch (lv.kind) {
+    case 'truth': { const wrong = lv.expect.filter((v, k) => resp[k] !== v).length; return { ok: wrong === 0, msg: wrong ? `${wrong} linha${wrong > 1 ? 's' : ''} com L errado ou em branco.` : '' }; }
+    case 'chips': { const S = new Set(resp), E = new Set(lv.expect); const miss = [...E].filter(x => !S.has(x)).length, extra = [...S].filter(x => !E.has(x)).length; const parts = []; if (miss) parts.push(`falta${miss > 1 ? 'm' : ''} ${miss} IP${miss > 1 ? 's' : ''}`); if (extra) parts.push(`há ${extra} IP${extra > 1 ? 's' : ''} a mais`); return { ok: !miss && !extra, msg: parts.length ? 'Na seleção, ' + parts.join(' e ') + '.' : '' }; }
+    case 'num': { const bad = lv.fields.filter((f, k) => { const v = C.parseNum(resp[k]); return !(Math.abs(v - f.ans) <= f.tol); }); return { ok: !bad.length, msg: bad.length ? (lv.fields.length > 1 ? `Confira: ${bad.map(f => f.label).join(', ')}.` : '') : '' }; }
+    case 'slider': { const v = +resp, T = lv.f(v); return { ok: T <= lv.lim + 1e-9, msg: lv.readout ? `Com x = ${nf(v, 1)}, T = ${nf(T, 2)} °C, acima do limite.` : 'O rack continua acima do limite.' }; }
+    case 'mc': return { ok: resp === lv.correct, msg: '' };
+  }
+  return { ok: false, msg: '' };
+};
+C.answerOf = function (lv) {
+  switch (lv.kind) {
+    case 'truth': return lv.expect.slice();
+    case 'chips': return lv.expect.slice();
+    case 'num': return lv.fields.map(f => String(f.ans).replace('.', ','));
+    case 'slider': return lv.xv;
+    case 'mc': return lv.correct;
+  }
+};
+return C;
+})();
+if (typeof module !== 'undefined') module.exports = C;
+
+</script>
+<script>
+/* CYPHER — interface, narrativa, sons, placar e modo apresentação. */
+(function () {
+'use strict';
+document.documentElement.lang = 'pt-BR';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const DF = [
+  { n: 'Fácil', ms: 250, pen: 60, hint: 30, sol: 60 },
+  { n: 'Médio', ms: 150, pen: 120, hint: 60, sol: 120 },
+  { n: 'Difícil', ms: 100, pen: 180, hint: 120, sol: 180 }
+];
+const fmt = s => { s = Math.max(0, Math.round(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pickR = a => a[Math.floor(Math.random() * a.length)];
+const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const store = {
+  get(k, def) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+};
+const prefs = Object.assign({ som: true, trilha: true }, store.get('cypher-prefs', {}));
+const savePrefs = () => store.set('cypher-prefs', prefs);
+
+/* ---------- som (Web Audio, sem arquivos) ---------- */
+const S = {
+  ctx: null, drone: null,
+  init() { if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; } try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ctx = null; } },
+  tone(f, d, type, v, when) {
+    if (!prefs.som || !this.ctx) return;
+    try {
+      const t = this.ctx.currentTime + (when || 0), o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type || 'square'; o.frequency.value = f; g.gain.setValueAtTime(v || 0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(this.ctx.destination); o.start(t); o.stop(t + d + 0.03);
+    } catch (e) { }
+  },
+  click() { this.tone(1300, 0.035, 'square', 0.025); },
+  ok() { [660, 880, 1320].forEach((f, i) => this.tone(f, 0.14, 'triangle', 0.07, i * 0.08)); },
+  err() { this.tone(110, 0.38, 'sawtooth', 0.08); this.tone(97, 0.38, 'sawtooth', 0.06, 0.05); },
+  hint() { this.tone(520, 0.09, 'sine', 0.07); this.tone(390, 0.14, 'sine', 0.07, 0.1); },
+  alarm() { [880, 660, 880, 660].forEach((f, i) => this.tone(f, 0.14, 'square', 0.04, i * 0.16)); },
+  phase() { [220, 330, 440].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.05, i * 0.12)); },
+  win() { [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, 0.28, 'triangle', 0.07, i * 0.12)); },
+  lose() { [440, 330, 247, 165].forEach((f, i) => this.tone(f, 0.4, 'sawtooth', 0.06, i * 0.22)); },
+  music(on) {
+    if (!this.ctx) return;
+    if (on && !this.drone && prefs.som && prefs.trilha) {
+      try {
+        const c = this.ctx, g = c.createGain(), lp = c.createBiquadFilter(), lfo = c.createOscillator(), lg = c.createGain();
+        g.gain.setValueAtTime(0, c.currentTime); g.gain.linearRampToValueAtTime(0.045, c.currentTime + 2.5);
+        lp.type = 'lowpass'; lp.frequency.value = 360; lfo.frequency.value = 0.07; lg.gain.value = 170;
+        lfo.connect(lg); lg.connect(lp.frequency);
+        const os = [55, 55.7, 82.4].map(f => { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.connect(lp); o.start(); return o; });
+        lp.connect(g); g.connect(c.destination); lfo.start();
+        this.drone = { g, os, lfo };
+      } catch (e) { this.drone = null; }
+    } else if (!on && this.drone) {
+      const { g, os, lfo } = this.drone, t = this.ctx.currentTime; this.drone = null;
+      try { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 0.6); } catch (e) { }
+      setTimeout(() => { try { os.forEach(o => o.stop()); lfo.stop(); } catch (e) { } }, 700);
+    }
+  }
+};
+
+/* ---------- falas ---------- */
+const TAUNTS = ['Errou. Cada segundo seu é um presente para mim.', 'Tabelas-verdade não mentem. Você, sim.', 'Quase. Quase não estabiliza servidor.', 'O Core agradece o calor extra.', 'Continue chutando. Eu tenho tempo; você não.', 'Isso foi uma conta ou um palpite?', 'Mais um erro e eu nem preciso fazer nada.', 'Seus servidores estão torcendo por você. Eu também, mas pelo erro.'];
+const QUIPS = ['Sorte de principiante.', 'Hm. Você sabe fazer contas.', 'Isso não muda nada.', 'Um nó. Faltam outros.', 'Não se acostume.'];
+const HINTQ = ['Pedindo ajuda? Interessante.', 'Dicas custam tempo. Eu adoro tempo.', 'Até o terminal está com pena de você.'];
+
+/* ---------- estado ---------- */
+let G = null, iv = null, lastField = null, ansCalc = 0, histCalc = [];
+window.CYPHER = { get G() { return G; }, C };
+
+function show(id) {
+  ['s-start', 's-phase', 's-game', 's-end'].forEach(x => { $('#' + x).hidden = x !== id; });
+  if (G) G.scr = id.slice(2);
+  updTools();
+  window.scrollTo(0, 0);
+}
+function updTools() {
+  $('#bSom').textContent = prefs.som ? 'Som: ligado' : 'Som: desligado';
+  $('#bSom').setAttribute('aria-pressed', String(prefs.som));
+  $('#bTrilha').textContent = prefs.trilha ? 'Trilha: ligada' : 'Trilha: desligada';
+  $('#bTrilha').setAttribute('aria-pressed', String(prefs.trilha));
+  $('#bTrilha').disabled = !prefs.som;
+  const p = G && G.pres && !G.over && G.scr === 'game';
+  $('#bPause').hidden = !p;
+  if (p) $('#bPause').textContent = G.paused ? 'Retomar (P)' : 'Pausar (P)';
+  $('#presBadge').hidden = !(G && G.pres && !G.over);
+}
+function log(tag, msg) {
+  const box = $('#log'), el = document.createElement('div');
+  el.className = 'ln ' + tag;
+  el.innerHTML = '<b>' + { nul: '[NullSet] ', sys: '[SISTEMA] ', alr: '[ALERTA] ', ok: '[OK] ' }[tag] + '</b><span></span>';
+  box.appendChild(el);
+  while (box.children.length > 4) box.removeChild(box.firstChild);
+  const sp = el.querySelector('span');
+  if (reduce) { sp.textContent = msg; return; }
+  let k = 0; const t = setInterval(() => { sp.textContent = msg.slice(0, ++k); if (k >= msg.length) clearInterval(t); }, 12);
+}
+function fx(kind) {
+  const f = $('#fx'); f.className = ''; void f.offsetWidth; f.className = kind;
+  if (kind === 'bad' && !reduce) { const m = $('#main'); m.classList.remove('shake'); void m.offsetWidth; m.classList.add('shake'); }
+}
+function fb(msg, cls) { $('#fb').textContent = msg; $('#fb').className = cls || ''; }
+function drawClock() {
+  const c = $('#clock'); c.textContent = fmt(G.t);
+  c.classList.toggle('low', G.t < 600 && G.t >= 300); c.classList.toggle('crit', G.t < 300);
+  c.classList.toggle('paused', !!G.paused);
+}
+
+/* ---------- partida ---------- */
+function start(d, codeIn, presIn) {
+  S.init();
+  const pres = presIn === undefined ? $('#pres').checked : presIn;
+  const code = C.cleanCode(codeIn === undefined ? $('#code').value : codeIn) || C.newCode();
+  G = {
+    d, D: DF[d], pres, code, t: 3600, i: 0, lv: C.genAll(code, d),
+    st: C.LEVELS.map(() => ({ solved: false, errs: 0, hinted: false, viaSol: false, seen: false, skipped: false, solOpen: false })),
+    errs: 0, hints: 0, sols: 0, paused: pres, over: false, alerts: {}, scr: 'start', phase: 0
+  };
+  document.documentElement.classList.toggle('pres', pres);
+  $('#log').innerHTML = ''; $('#keys').hidden = !pres;
+  $('#codeLbl').textContent = 'Código da partida: ' + code;
+  $('#bar').classList.toggle('jump', pres);
+  histCalc = []; drawHist();
+  clearInterval(iv); iv = setInterval(tick, G.D.ms);
+  S.music(true);
+  drawClock();
+  openPhase(1);
+}
+function openPhase(p) {
+  G.phase = p; const P = C.PHASES[p];
+  $('#pk').textContent = `Fase ${p} de 3 · ${G.D.n}`;
+  $('#pn').textContent = '0' + p;
+  $('#pt').textContent = P.name;
+  $('#ps').textContent = P.story;
+  $('#pc').textContent = P.concepts;
+  show('s-phase'); S.phase();
+  setTimeout(() => $('#pgo').focus(), 50);
+}
+function enterPhase() {
+  show('s-game');
+  if (G.phase === 1 && !G.st[0].seen) log('nul', 'Boa noite, SysAdmin. Seu Core tem 60 minutos de vida. Vamos ver quanto da sua lógica sobrevive.');
+  const n = C.LEVELS.filter(l => l.phase === G.phase).length;
+  log('sys', `${C.PHASES[G.phase].name}: ${n} nós comprometidos.`);
+  render();
+}
+function tick() {
+  if (!G || G.over || G.paused || G.scr !== 'game') return;
+  G.t--; drawClock(); alerts();
+  if (G.t <= 0) end(false);
+}
+function alerts() {
+  const A = G.alerts;
+  if (G.t <= 600 && !A.a10) { A.a10 = 1; log('alr', 'Temperatura do Core crítica: 10 minutos.'); S.alarm(); }
+  if (G.t <= 300 && !A.a5) { A.a5 = 1; log('alr', '5 minutos para o buffer overflow.'); log('nul', 'Tic-tac, SysAdmin.'); }
+  if (G.t <= 300 && G.t > 0 && G.t % 60 === 0) S.alarm();
+  if (G.t <= 60 && !A.a1) { A.a1 = 1; log('alr', 'Últimos 60 segundos.'); }
+}
+function cost(s) { if (G.pres) return; G.t = Math.max(0, G.t - s); drawClock(); alerts(); if (G.t <= 0) end(false); }
+
+/* ---------- nó ---------- */
+function drawBar() {
+  const b = $('#bar'); b.innerHTML = '';
+  C.LEVELS.forEach((lv, k) => {
+    const i = document.createElement('i'), st = G.st[k];
+    if (k > 0 && lv.phase !== C.LEVELS[k - 1].phase) i.classList.add('gap');
+    if (st.solved) i.classList.add('d'); else if (st.skipped) i.classList.add('s');
+    if (k === G.i) i.classList.add('n');
+    i.title = `Nó ${k + 1}: ${lv.title}`;
+    if (G.pres) i.onclick = () => { G.i = k; render(); };
+    b.appendChild(i);
+  });
+}
+function render() {
+  const k = G.i, M = C.LEVELS[k], L = G.lv[k], st = G.st[k];
+  if (M.phase !== G.phase) G.phase = M.phase;
+  $('#ph').textContent = `Fase ${M.phase} · ${C.PHASES[M.phase].name} · ${G.D.n}`;
+  drawBar();
+  $('#h').textContent = `Nó ${k + 1}/9 · ${M.title}`;
+  $('#sc').textContent = L.sc;
+  $('#q').textContent = L.q;
+  $('#extra').innerHTML = L.extra || '';
+  $('#chart').innerHTML = L.chart || '';
+  $('#hintTxt').hidden = !st.hinted; $('#hintTxt').textContent = 'Dica: ' + L.hint;
+  $('#sol').innerHTML = solHTML(L);
+  $('#sol').hidden = !st.solOpen;
+  fb(st.solved ? (st.viaSol ? 'Nó liberado pela resolução comentada.' : 'Nó estabilizado.') : '', st.solved ? (st.viaSol ? 'hintm' : 'okm') : '');
+  build(L, st);
+  acts();
+  if (!st.seen) { st.seen = true; log('sys', `Nó ${k + 1}/9: ${L.log}`); }
+}
+/* resolução comentada: conceito, exemplo simples, a sua partida e o erro comum */
+const txt = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\^(\d+)/g, '<sup>$1</sup>');
+const item = s => s.charAt(0) === '<' ? '<div class="blk">' + s + '</div>' : '<p>' + txt(s) + '</p>';
+function solHTML(L) {
+  const lr = L.learn; let n = 0;
+  const steps = L.sol.map(s => s.charAt(0) === '<' ? '<div class="blk">' + s + '</div>' : '<p class="st"><b>' + (++n) + '.</b> ' + txt(s) + '</p>').join('');
+  return '<h3>Resolução comentada</h3>' +
+    '<section class="lx"><h4>O conceito</h4>' + lr.concept.map(item).join('') + '</section>' +
+    '<section class="lx ex"><h4>Exemplo simples</h4>' + lr.example.map(item).join('') + '</section>' +
+    '<section class="lx"><h4>Na sua partida</h4>' + steps + '</section>' +
+    '<p class="pit"><b>Erro comum.</b> ' + txt(lr.pitfall) + '</p>';
+}
+function mk(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
+function goBtn(label) { const b = mk('button', 'go', label); b.type = 'button'; b.onclick = () => submit(); return b; }
+function build(L, st) {
+  const b = $('#box'); b.innerHTML = ''; b.className = st.solved ? 'locked' : '';
+  const ans = C.answerOf(L);
+  if (L.kind === 'truth') {
+    G.resp = st.solved ? ans.slice() : L.rows.map(() => null);
+    const wrap = mk('div', 'scroll'), t = mk('table', 'tg');
+    const hr = mk('tr'); L.vars.forEach(v => hr.appendChild(mk('th', '', v))); hr.appendChild(mk('th', '', 'L')); t.appendChild(hr);
+    L.rows.forEach((row, k) => {
+      const tr = mk('tr'); row.forEach(x => tr.appendChild(mk('td', '', x ? 'V' : 'F')));
+      const td = mk('td'), btn = mk('button', 'c'); btn.type = 'button';
+      const paint = () => { const v = G.resp[k]; btn.textContent = v === null ? '?' : v ? 'V' : 'F'; btn.className = 'c' + (v === null ? '' : v ? ' v' : ' f'); btn.setAttribute('aria-label', `Linha ${k + 1}: L = ${btn.textContent}`); };
+      btn.onclick = () => { const v = G.resp[k]; G.resp[k] = v === null ? true : v ? false : null; paint(); S.click(); };
+      paint(); td.appendChild(btn); tr.appendChild(td); t.appendChild(tr);
+    });
+    wrap.appendChild(t); b.appendChild(wrap); b.appendChild(goBtn('Validar tabela'));
+  } else if (L.kind === 'chips') {
+    G.resp = new Set(st.solved ? ans : []);
+    const box = mk('div', 'chips');
+    L.items.forEach(x => {
+      const c = mk('button', 'chip' + (G.resp.has(x) ? ' on' : ''), '10.0.0.' + x); c.type = 'button';
+      c.setAttribute('aria-pressed', String(G.resp.has(x)));
+      c.onclick = () => { G.resp.has(x) ? G.resp.delete(x) : G.resp.add(x); c.classList.toggle('on'); c.setAttribute('aria-pressed', String(G.resp.has(x))); S.click(); };
+      box.appendChild(c);
+    });
+    b.appendChild(box); b.appendChild(goBtn('Aplicar regra'));
+  } else if (L.kind === 'num') {
+    const box = mk('div', 'fields');
+    L.fields.forEach((f, k) => {
+      const lab = mk('label'); lab.htmlFor = 'f' + k; lab.appendChild(document.createTextNode(f.label + ' ='));
+      const inp = mk('input'); inp.type = 'text'; inp.id = 'f' + k; inp.inputMode = 'decimal'; inp.autocomplete = 'off'; inp.spellcheck = false;
+      if (st.solved) inp.value = C.nf(f.ans, 4);
+      inp.onfocus = () => { lastField = inp; };
+      inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+      lab.appendChild(inp); box.appendChild(lab);
+    });
+    b.appendChild(box); b.appendChild(goBtn('Executar'));
+  } else if (L.kind === 'slider') {
+    const big = mk('div', 'big');
+    big.innerHTML = L.readout ? '<span id="tv"></span> °C' : 'T = ? °C <small>sensor corrompido</small>';
+    const rg = mk('input'); rg.type = 'range'; rg.id = 'rg'; rg.min = L.min; rg.max = L.max; rg.step = L.step; rg.value = st.solved ? L.xv : 0;
+    rg.setAttribute('aria-label', 'Rotação do cooler, em centenas de RPM');
+    const lab = mk('p', 'dim');
+    const upd = () => { const x = +rg.value; lab.textContent = `x = ${C.nf(x, 1)} (×100 RPM)`; if (L.readout) $('#tv').textContent = C.nf(L.f(x), 2); };
+    b.appendChild(big); b.appendChild(rg); b.appendChild(lab); upd(); rg.oninput = upd;
+    b.appendChild(goBtn('Travar rotação'));
+  } else if (L.kind === 'mc') {
+    const box = mk('div', 'mcs');
+    L.options.forEach((o, k) => {
+      const btn = mk('button', st.solved && k === L.correct ? 'r' : '', o); btn.type = 'button'; btn.dataset.k = k;
+      btn.onclick = () => { if (btn.classList.contains('x')) return; submit(k); };
+      box.appendChild(btn);
+    });
+    b.appendChild(box);
+  }
+  b.querySelectorAll('button,input').forEach(e => { if (st.solved) e.disabled = true; });
+}
+function acts() {
+  const k = G.i, st = G.st[k], last = k === C.LEVELS.length - 1;
+  $('#hb').hidden = st.solved;
+  $('#hb').disabled = st.hinted;
+  $('#hb').textContent = st.hinted ? 'Dica usada' : (G.pres ? 'Mostrar dica' : `Dica (−${fmt(G.D.hint)})`);
+  const canSol = st.solved || G.pres || st.errs >= 3;
+  $('#sb').hidden = !canSol;
+  $('#sb').textContent = (st.solved || G.pres) ? (st.solOpen ? 'Ocultar resolução' : 'Ver resolução comentada') : `Ver resolução e liberar o nó (−${fmt(G.D.sol)})`;
+  $('#nx').hidden = !(st.solved || G.pres);
+  $('#nx').textContent = last ? (st.solved ? 'Desarmar o contador' : 'Encerrar demonstração') : (st.solved ? 'Próximo nó' : 'Pular nó');
+  $('#pv').hidden = !(G.pres && k > 0);
+}
+function submit(mcIdx) {
+  if (!G || G.over) return;
+  const k = G.i, L = G.lv[k], st = G.st[k]; if (st.solved) return;
+  let resp;
+  if (L.kind === 'truth') { if (G.resp.some(v => v === null)) { fb('Preencha todas as linhas da coluna L antes de validar.', 'hintm'); return; } resp = G.resp.slice(); }
+  else if (L.kind === 'chips') { if (!G.resp.size) { fb('Selecione pelo menos um IP.', 'hintm'); return; } resp = [...G.resp]; }
+  else if (L.kind === 'num') {
+    resp = $$('#box input').map(i => i.value);
+    if (resp.some(v => !String(v).trim())) { fb('Preencha todos os campos antes de executar.', 'hintm'); return; }
+    if (resp.some(v => isNaN(C.parseNum(v)))) { fb('Use apenas números, com vírgula ou ponto para decimais. Para contas, use a calculadora.', 'hintm'); return; }
+  }
+  else if (L.kind === 'slider') resp = +$('#rg').value;
+  else resp = mcIdx;
+  const r = C.check(L, resp);
+  if (r.ok) nodeWin(); else nodeFail(r.msg, mcIdx);
+}
+function nodeWin() {
+  const k = G.i, st = G.st[k]; st.solved = true;
+  S.ok(); fx('ok');
+  log('ok', `Nó ${k + 1} estabilizado.`);
+  if (Math.random() < 0.45) setTimeout(() => { if (G && !G.over) log('nul', pickR(QUIPS)); }, 600);
+  render();
+  $('#nx').focus();
+}
+function nodeFail(msg, mcIdx) {
+  const k = G.i, st = G.st[k]; st.errs++; G.errs++;
+  S.err(); fx('bad');
+  if (G.over) return;
+  log('nul', pickR(TAUNTS));
+  if (mcIdx !== undefined) { const b = $(`#box [data-k="${mcIdx}"]`); if (b) b.classList.add('x'); }
+  cost(G.D.pen);
+  if (G.over) return;
+  fb(`Resposta incorreta. ${msg || ''}${G.pres ? '' : ` (−${fmt(G.D.pen)})`}${st.errs === 3 && !G.pres ? ' A resolução comentada está disponível.' : ''}`, 'badm');
+  acts();
+}
+function useHint() {
+  const st = G.st[G.i]; if (st.hinted || st.solved) return;
+  st.hinted = true; G.hints++; S.hint();
+  $('#hintTxt').hidden = false;
+  log('nul', pickR(HINTQ));
+  cost(G.D.hint); if (G.over) return;
+  acts();
+}
+function toggleSol() {
+  const k = G.i, st = G.st[k];
+  if (!st.solved && !G.pres) {
+    if (st.errs < 3) return;
+    cost(G.D.sol); if (G.over) return;
+    G.sols++; st.solved = true; st.viaSol = true; st.solOpen = true;
+    log('sys', 'Resolução de emergência aplicada. Penalidade registrada.');
+    render(); return;
+  }
+  st.solOpen = !st.solOpen; $('#sol').hidden = !st.solOpen; acts();
+  if (st.solOpen) $('#sol').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+}
+function next() {
+  const k = G.i, st = G.st[k];
+  if (!st.solved) { if (!G.pres) return; st.skipped = true; }
+  if (k === C.LEVELS.length - 1) { end(true); return; }
+  G.i++;
+  const p = C.LEVELS[G.i].phase;
+  if (p !== C.LEVELS[k].phase) openPhase(p); else render();
+}
+function prev() { if (G.pres && G.i > 0) { G.i--; render(); } }
+function togglePause() { if (!G || !G.pres || G.over) return; G.paused = !G.paused; drawClock(); updTools(); log('sys', G.paused ? 'Relógio pausado.' : 'Relógio retomado.'); }
+
+/* ---------- fim ---------- */
+function end(win) {
+  if (!G || G.over) return;
+  G.over = true; clearInterval(iv); S.music(false);
+  const solvedN = G.st.filter(s => s.solved).length;
+  win ? S.win() : S.lose();
+  if (win && G.pres) { $('#ek').textContent = 'Modo apresentação'; $('#et').textContent = 'Demonstração concluída'; $('#em').textContent = `Os nove nós foram percorridos com o código ${G.code}. Use “Repetir este código” para mostrar os mesmos números de novo.`; }
+  else if (win) {
+    $('#ek').textContent = 'Contador desarmado';
+    $('#et').textContent = 'NullSet neutralizado';
+    $('#em').textContent = `O contador congela em ${fmt(G.t)}. O Protocolo de Colapso Lógico é purificado, as tabelas booleanas voltam ao normal e os painéis da Nexus Corp ficam verdes, um a um. No terminal, uma última linha do NullSet: “Dessa vez, SysAdmin.”`;
+  } else {
+    $('#ek').textContent = 'Tempo esgotado';
+    $('#et').textContent = 'Buffer overflow no Core';
+    $('#em').textContent = `00:00. O Core principal sofre o estouro de memória e, nesta história, os data centers do mundo apagam em sequência. O NullSet assina o log: “Lógica é tudo, SysAdmin.” Você estabilizou ${solvedN} de 9 nós. Abra a resolução comentada dos próximos e tente de novo.`;
+  }
+  const rank = !win || G.pres ? '—' : G.t > 1800 && !G.sols ? 'Arquiteto lendário' : G.t > 900 ? 'SysAdmin sênior' : 'Sobrevivente';
+  const items = [['Tempo restante', fmt(G.t)], ['Nós estabilizados', solvedN + ' de 9'], ['Erros', G.errs], ['Dicas', G.hints], ['Resoluções liberadas', G.sols], ['Dificuldade', G.D.n], ['Código da partida', G.code]];
+  if (win && !G.pres) items.unshift(['Patente', rank]);
+  $('#stats').innerHTML = items.map(([a, b]) => `<div><b>${esc(b)}</b><span>${esc(a)}</span></div>`).join('');
+  const canSave = win && !G.pres && store.set('cypher-test', 1);
+  $('#save').hidden = !canSave; $('#saveMsg').textContent = ''; $('#nm').value = ''; $('#bSave').disabled = false;
+  $('#endScores').innerHTML = '<p class="kick" style="margin-top:6px">Placar · ' + G.D.n + '</p>' + scoresHTML(G.d);
+  show('s-end');
+}
+
+/* ---------- placar ---------- */
+const SKEY = 'cypher-scores-v1';
+const loadScores = () => { const s = store.get(SKEY, null); return s && typeof s === 'object' ? s : { 0: [], 1: [], 2: [] }; };
+function saveScore(name) {
+  const all = loadScores(), arr = Array.isArray(all[G.d]) ? all[G.d] : [];
+  arr.push({ n: name, t: G.t, e: G.errs, h: G.hints, s: G.sols, c: G.code, dt: new Date().toLocaleDateString('pt-BR') });
+  arr.sort((a, b) => b.t - a.t || a.e - b.e);
+  all[G.d] = arr.slice(0, 10);
+  return store.set(SKEY, all);
+}
+function scoresHTML(d) {
+  const arr = loadScores()[d] || [];
+  if (!arr.length) return `<p class="dim">Nenhum tempo registrado no modo ${DF[d].n} neste navegador.</p>`;
+  return '<div class="scroll"><table class="sc-t"><tr><th>#</th><th>Nome</th><th>Tempo</th><th>Erros</th><th>Dicas</th><th>Código</th><th>Data</th></tr>' +
+    arr.map((s, k) => `<tr><td>${k + 1}</td><td>${esc(s.n)}</td><td>${fmt(s.t)}</td><td>${+s.e || 0}</td><td>${+s.h || 0}</td><td>${esc(s.c || '')}</td><td>${esc(s.dt || '')}</td></tr>`).join('') + '</table></div>';
+}
+function drawStartScores(d) {
+  const box = $('#scores');
+  box.innerHTML = '<div class="tabs" role="tablist">' + DF.map((x, k) => `<button type="button" role="tab" aria-selected="${k === d}" data-t="${k}">${x.n}</button>`).join('') + '</div>' + scoresHTML(d) + '<p class="dim" style="margin-top:8px">O placar fica salvo apenas neste navegador.</p>';
+  box.querySelectorAll('[data-t]').forEach(b => { b.onclick = () => drawStartScores(+b.dataset.t); });
+}
+
+/* ---------- calculadora ---------- */
+function toggleCalc(force) {
+  const c = $('#calc'), open = force === undefined ? c.hidden : force;
+  c.hidden = !open; $('#cb').setAttribute('aria-expanded', String(open));
+  if (open) { $('#ci').focus(); c.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' }); }
+}
+function drawHist() {
+  const h = $('#hist'); h.innerHTML = '';
+  histCalc.forEach(v => {
+    const b = mk('button', '', C.nf(v, 6)); b.type = 'button'; b.title = 'Colar no campo de resposta';
+    b.onclick = () => { const txt = C.nf(v, 6).replace(/ /g, ''); if (lastField && document.body.contains(lastField) && !lastField.disabled) { lastField.value = txt; lastField.focus(); } else { $('#ci').value += txt; calcUpd(); } };
+    h.appendChild(b);
+  });
+}
+function calcUpd() {
+  const s = $('#ci').value, v = C.calc(s, ansCalc), r = $('#res');
+  if (!s.trim()) { r.textContent = ''; r.className = ''; return v; }
+  if (isFinite(v)) { r.textContent = '= ' + C.nf(v, 8); r.className = ''; }
+  else { r.textContent = 'Expressão incompleta ou inválida'; r.className = 'err'; }
+  return v;
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener('pointerdown', () => S.init(), { once: true });
+$$('[data-d]').forEach(b => { b.onclick = () => start(+b.dataset.d); });
+$('#bScores').onclick = () => { const s = $('#scores'), open = s.hidden; s.hidden = !open; $('#bScores').setAttribute('aria-expanded', String(open)); $('#bScores').textContent = open ? 'Ocultar placar' : 'Ver placar'; if (open) drawStartScores(1); };
+$('#pgo').onclick = enterPhase;
+$('#hb').onclick = useHint;
+$('#cb').onclick = () => toggleCalc();
+$('#sb').onclick = toggleSol;
+$('#nx').onclick = next;
+$('#pv').onclick = prev;
+$('#bPause').onclick = togglePause;
+$('#bSom').onclick = () => { S.init(); prefs.som = !prefs.som; savePrefs(); S.music(prefs.som && G && !G.over); updTools(); };
+$('#bTrilha').onclick = () => { S.init(); prefs.trilha = !prefs.trilha; savePrefs(); S.music(prefs.trilha && G && !G.over); updTools(); };
+$('#ci').oninput = calcUpd;
+$('#ci').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const v = calcUpd(); if (isFinite(v)) { ansCalc = v; histCalc = [v, ...histCalc.filter(x => x !== v)].slice(0, 6); drawHist(); } } if (e.key === 'Escape') toggleCalc(false); };
+$('#bSave').onclick = () => {
+  const nm = $('#nm').value.trim().slice(0, 12) || 'SysAdmin';
+  const okS = saveScore(nm); $('#bSave').disabled = true;
+  $('#saveMsg').textContent = okS ? 'Tempo salvo no placar deste navegador.' : 'Este navegador não permite salvar o placar.';
+  $('#endScores').innerHTML = '<p class="kick" style="margin-top:6px">Placar · ' + G.D.n + '</p>' + scoresHTML(G.d);
+};
+$('#nm').onkeydown = e => { if (e.key === 'Enter' && !$('#bSave').disabled) $('#bSave').click(); };
+$('#again').onclick = () => start(G.d, '', G.pres);
+$('#same').onclick = () => start(G.d, G.code, G.pres);
+$('#home').onclick = () => { $('#code').value = ''; document.documentElement.classList.remove('pres'); G = null; show('s-start'); };
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.matches('input[type=text],textarea')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'm') { $('#bSom').click(); return; }
+  if (!G || G.over) return;
+  if (G.scr === 'phase' && (k === 'enter' || k === ' ') && e.target.id !== 'pgo') { e.preventDefault(); enterPhase(); return; }
+  if (G.scr !== 'game') return;
+  if (k === 'c') { e.preventDefault(); toggleCalc(); }
+  if (G.pres) {
+    if (k === 'p') togglePause();
+    else if (k === 'n' || k === 'arrowright') next();
+    else if (k === 'b' || k === 'arrowleft') prev();
+    else if (k === 's') toggleSol();
+  }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) S.music(false); else if (G && !G.over) S.music(true); });
+
+/* atualização ao vivo da página publicada: preserva a partida em andamento */
+window.claude?.hot?.snapshot?.(() => G && !G.over ? { g: { d: G.d, code: G.code, pres: G.pres, t: G.t, i: G.i, st: G.st, errs: G.errs, hints: G.hints, sols: G.sols, scr: G.scr, phase: G.phase, alerts: G.alerts } } : {});
+function boot(data) {
+  updTools();
+  const g = data && data.g; if (!g) return;
+  try {
+    start(g.d, g.code, g.pres);
+    Object.assign(G, { t: g.t, i: g.i, st: g.st, errs: g.errs, hints: g.hints, sols: g.sols, alerts: g.alerts || {}, phase: g.phase });
+    drawClock();
+    if (g.scr === 'game') { show('s-game'); render(); } else openPhase(g.phase || 1);
+  } catch (e) { G = null; show('s-start'); }
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+})();
+
+</script>
+</body>
+</html>

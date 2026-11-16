@@ -1,0 +1,113 @@
+<div id="fx" aria-hidden="true"></div>
+<header class="hdr">
+  <div class="wrap">
+    <div class="brand">CYPHER<small>Nexus Corp · terminal de emergência</small><span class="badge" id="presBadge" hidden>Apresentação</span></div>
+    <div class="tools">
+      <button id="bPause" type="button" hidden>Pausar (P)</button>
+      <button id="bSom" type="button" aria-pressed="true">Som: ligado</button>
+      <button id="bTrilha" type="button" aria-pressed="true">Trilha: ligada</button>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="main">
+
+<section id="s-start">
+  <div class="card">
+    <p class="kick">Nexus Corp · 2038 · plantão noturno</p>
+    <h1>CYPHER</h1>
+    <p class="dim" style="margin-top:6px">O Código da Lógica</p>
+    <div class="lore">
+      <p>Os alarmes do painel central piscam em vermelho. O grupo NullSet injetou um Protocolo de Colapso Lógico, que corrompe as tabelas booleanas e as matrizes dos servidores. Em 60 minutos de relógio, o Core principal sofre um buffer overflow e, nesta história, os data centers do mundo apagam.</p>
+      <p>Você é o administrador de sistemas sênior de plantão, sozinho no terminal de emergência. São três setores e nove nós comprometidos; cada um só volta ao ar com a matemática certa.</p>
+    </div>
+    <p class="kick" style="margin-top:8px">Escolha a dificuldade e comece</p>
+    <div class="diff">
+      <button class="go" type="button" data-d="0">Fácil<small>relógio dura 15 min reais · erro −1 min</small></button>
+      <button class="go" type="button" data-d="1">Médio<small>relógio dura 9 min reais · erro −2 min</small></button>
+      <button class="go" type="button" data-d="2">Difícil<small>relógio dura 6 min reais · erro −3 min</small></button>
+    </div>
+    <div class="opts">
+      <label class="chk" for="pres"><input type="checkbox" id="pres"><span>Modo apresentação <span class="dim">· relógio começa pausado, letras maiores, atalhos para pular e voltar nós. Não conta no placar.</span></span></label>
+      <div class="codein"><label for="code">Código da partida</label><input type="text" id="code" maxlength="8" placeholder="opcional" autocomplete="off" spellcheck="false"><span class="dim">Repita um código para jogar com os mesmos números.</span></div>
+    </div>
+    <div class="row"><button type="button" id="bScores" aria-expanded="false">Ver placar</button></div>
+    <div id="scores" hidden></div>
+    <details>
+      <summary>Como jogar</summary>
+      <ul>
+        <li>Cada nó traz um cenário, uma pergunta e a ferramenta de resposta (tabela, seleção, campos, controle ou alternativas).</li>
+        <li>Os números são sorteados a cada partida. O código da partida aparece no topo do jogo e permite repetir os mesmos números.</li>
+        <li>Erros e dicas descontam tempo. Depois de 3 erros no mesmo nó, você pode liberar a resolução comentada pagando tempo.</li>
+        <li>Ao acertar, a resolução comentada mostra o passo a passo com os números da sua partida.</li>
+        <li>A calculadora aceita + − * / ^ ( ), fatorial (5!), raiz (sqrt), ln, log, C(n;k) e A(n;k). Decimais com vírgula ou ponto.</li>
+        <li>Atalhos: C abre a calculadora, M liga ou desliga o som. No modo apresentação: P pausa, N avança, B volta e S mostra a resolução.</li>
+      </ul>
+    </details>
+  </div>
+</section>
+
+<section id="s-phase" hidden>
+  <div class="card phase">
+    <p class="kick" id="pk"></p>
+    <div class="num" id="pn"></div>
+    <h2 id="pt"></h2>
+    <p id="ps" class="lore"></p>
+    <p class="concepts" id="pc"></p>
+    <button class="go" type="button" id="pgo">Entrar no setor</button>
+  </div>
+</section>
+
+<section id="s-game" hidden>
+  <div class="top">
+    <div><div id="ph" class="kick"></div><div id="codeLbl" class="dim"></div></div>
+    <div id="clock" role="timer" aria-label="Tempo restante">60:00</div>
+  </div>
+  <div id="bar"></div>
+  <div id="log" aria-live="polite"></div>
+  <div class="card" id="node">
+    <h2 id="h"></h2>
+    <p class="sc" id="sc"></p>
+    <div id="extra"></div>
+    <div id="chart"></div>
+    <p class="q" id="q"></p>
+    <div id="box"></div>
+    <div id="fb" aria-live="polite"></div>
+    <div class="row acts">
+      <button type="button" id="hb"></button>
+      <button type="button" id="cb" aria-expanded="false">Calculadora (C)</button>
+      <button type="button" id="sb" hidden></button>
+      <button type="button" id="pv" hidden>Nó anterior</button>
+      <button type="button" class="go" id="nx" hidden>Próximo nó</button>
+    </div>
+    <div id="hintTxt" class="hint" hidden></div>
+    <div id="sol" class="sol" hidden></div>
+  </div>
+  <div class="card" id="calc" hidden>
+    <label for="ci" class="dim">Calculadora · Enter guarda o resultado; toque num resultado guardado para colar no campo de resposta.</label>
+    <input type="text" id="ci" autocomplete="off" spellcheck="false" inputmode="text" placeholder="ex.: 2*3^5, C(6;2), 1-(0,95)^4">
+    <div id="res"></div>
+    <div id="hist"></div>
+  </div>
+  <p id="keys" class="dim keys" hidden>Atalhos do modo apresentação: P pausar · N próximo nó · B nó anterior · S resolução · C calculadora · M som</p>
+</section>
+
+<section id="s-end" hidden>
+  <div class="card">
+    <p class="kick" id="ek"></p>
+    <h2 id="et"></h2>
+    <p id="em" class="lore"></p>
+    <div id="stats" class="stats"></div>
+    <div id="save" hidden>
+      <div class="row"><label for="nm">Seu nome no placar</label><input type="text" id="nm" maxlength="12" autocomplete="off"><button type="button" class="go" id="bSave">Salvar tempo</button></div>
+      <p class="dim" id="saveMsg" style="margin-top:6px"></p>
+    </div>
+    <div id="endScores"></div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="go" id="again">Nova partida</button>
+      <button type="button" id="same">Repetir este código</button>
+      <button type="button" id="home">Menu inicial</button>
+    </div>
+  </div>
+</section>
+
+</main>
